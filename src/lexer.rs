@@ -87,7 +87,9 @@ pub struct Lexer<'input> {
 
 impl<'input> Lexer<'input> {
     pub fn new(input: &'input str) -> Self {
-        Self { token_stream: Token::lexer(input).spanned() }
+        Self {
+            token_stream: Token::lexer(input).spanned(),
+        }
     }
 }
 

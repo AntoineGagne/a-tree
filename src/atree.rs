@@ -15,7 +15,11 @@ pub enum ATreeError<'a> {
     #[error("ABE refers to non-existing attribute '{0:?}'")]
     NonExistingAttribute(String),
     #[error("{name:?}: mismatching types => expected: {expected:?}, found: {actual:?}")]
-    MismatchingTypes { name: String, expected: AttributeKind, actual: PredicateKind },
+    MismatchingTypes {
+        name: String,
+        expected: AttributeKind,
+        actual: PredicateKind,
+    },
     #[error("failed to parse the expression with {0:?}")]
     ParseError(ATreeParseError<'a>),
 }
@@ -27,9 +31,25 @@ pub struct ATree {
 }
 
 pub enum ATreeNode {
-    LNode { id: usize, parents: Vec<usize>, level: usize, predicate: Predicate },
-    INode { id: usize, parents: Vec<usize>, children: Vec<usize>, level: usize, operator: Operator },
-    RNode { id: usize, children: Vec<usize>, level: usize, operator: Operator },
+    LNode {
+        id: usize,
+        parents: Vec<usize>,
+        level: usize,
+        predicate: Predicate,
+    },
+    INode {
+        id: usize,
+        parents: Vec<usize>,
+        children: Vec<usize>,
+        level: usize,
+        operator: Operator,
+    },
+    RNode {
+        id: usize,
+        children: Vec<usize>,
+        level: usize,
+        operator: Operator,
+    },
 }
 
 impl ATreeNode {
@@ -55,7 +75,7 @@ impl Predicate {
                 let id = match (&ast.kind, attributes.by_id(id)) {
                     (PredicateKind::Set(_, ListLiteral::StringList(_)), AttributeKind::String) => {
                         Ok(id)
-                    },
+                    }
                     (
                         PredicateKind::Set(_, ListLiteral::IntegerList(_)),
                         AttributeKind::Integer,
@@ -94,7 +114,10 @@ impl Predicate {
                         actual: actual.clone(),
                     }),
                 }?;
-                Ok(Predicate { attribute: id, kind: ast.kind.clone() })
+                Ok(Predicate {
+                    attribute: id,
+                    kind: ast.kind.clone(),
+                })
             })
     }
 }
@@ -109,7 +132,11 @@ impl ATree {
     pub fn new(definitions: &[AttributeDefinition]) -> Result<Self, ATreeError> {
         let attributes = AttributeTable::new(definitions)?;
         let strings = StringTable::new();
-        Ok(Self { attributes, strings, nodes: vec![] })
+        Ok(Self {
+            attributes,
+            strings,
+            nodes: vec![],
+        })
     }
 
     pub fn insert<'a, 'tree: 'a>(&'tree mut self, abe: &'a str) -> Result<usize, ATreeError<'a>> {
@@ -136,7 +163,11 @@ pub struct EventBuilder<'a> {
 
 impl<'a> EventBuilder<'a> {
     fn new(attributes: &'a AttributeTable, strings: &'a StringTable) -> Self {
-        Self { attributes, strings, by_ids: Vec::with_capacity(attributes.len()) }
+        Self {
+            attributes,
+            strings,
+            by_ids: Vec::with_capacity(attributes.len()),
+        }
     }
 
     fn build(mut self) -> Result<Event, ATreeError<'a>> {
@@ -208,7 +239,10 @@ struct StringTable {
 
 impl StringTable {
     fn new() -> Self {
-        Self { by_values: HashMap::new(), counter: 0 }
+        Self {
+            by_values: HashMap::new(),
+            counter: 0,
+        }
     }
 
     fn get(&self, value: &str) -> Option<StringId> {
@@ -288,32 +322,50 @@ enum AttributeKind {
 impl AttributeDefinition {
     pub fn boolean(name: &str) -> Self {
         let kind = AttributeKind::Boolean;
-        Self { name: name.to_owned(), kind }
+        Self {
+            name: name.to_owned(),
+            kind,
+        }
     }
 
     pub fn integer(name: &str) -> Self {
         let kind = AttributeKind::Integer;
-        Self { name: name.to_owned(), kind }
+        Self {
+            name: name.to_owned(),
+            kind,
+        }
     }
 
     pub fn float(name: &str) -> Self {
         let kind = AttributeKind::Float;
-        Self { name: name.to_owned(), kind }
+        Self {
+            name: name.to_owned(),
+            kind,
+        }
     }
 
     pub fn string(name: &str) -> Self {
         let kind = AttributeKind::String;
-        Self { name: name.to_owned(), kind }
+        Self {
+            name: name.to_owned(),
+            kind,
+        }
     }
 
     pub fn integer_list(name: &str) -> Self {
         let kind = AttributeKind::IntegerList;
-        Self { name: name.to_owned(), kind }
+        Self {
+            name: name.to_owned(),
+            kind,
+        }
     }
 
     pub fn string_list(name: &str) -> Self {
         let kind = AttributeKind::StringList;
-        Self { name: name.to_owned(), kind }
+        Self {
+            name: name.to_owned(),
+            kind,
+        }
     }
 }
 
@@ -454,7 +506,9 @@ mod tests {
         let mut builder = atree.make_event();
 
         assert!(builder.with_boolean("private", true).is_ok());
-        assert!(builder.with_string_list("deals", &["deal-1", "deal-2"]).is_ok());
+        assert!(builder
+            .with_string_list("deals", &["deal-1", "deal-2"])
+            .is_ok());
         assert!(builder.with_integer("exchange_id", 1).is_ok());
         assert!(builder.with_float("bidfloor", Decimal::new(1, 0)).is_ok());
         assert!(builder.with_string("country", "US").is_ok());
@@ -470,6 +524,9 @@ mod tests {
 
         let event_builder = atree.make_event();
 
-        assert!(matches!(event_builder.build(), Err(ATreeError::MissingAttributes)));
+        assert!(matches!(
+            event_builder.build(),
+            Err(ATreeError::MissingAttributes)
+        ));
     }
 }

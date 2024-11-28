@@ -15,14 +15,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Cache Cargo dependencies folder
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         env:
           cache-name: cargo-dependencies
         with:
           path: ~/.cargo
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.toml') }}-${{ hashFiles('**/Cargo.lock') }}
       - name: Cache Cargo target folder
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         env:
           cache-name: cargo-target
         with:
@@ -37,14 +37,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Cache Cargo dependencies folder
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         env:
           cache-name: cargo-dependencies
         with:
           path: ~/.cargo
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.toml') }}-${{ hashFiles('**/Cargo.lock') }}
       - name: Cache Cargo target folder
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         env:
           cache-name: cargo-target
         with:

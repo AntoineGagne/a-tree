@@ -1,0 +1,86 @@
+# This file has been generated using '.gitattributes Generator'.
+# You can generate yours at http://ihopepeace.github.io/gitattributes_generator
+
+* text=auto
+
+# Explicitly declare text files that should be normalized and converted
+# to native line endings on checkout.
+*.js text
+*.json text
+*.cpp text
+*.c text
+*.hpp text
+*.h text
+*.py text
+*.hs text
+*.tex text
+*.sty text
+*.cls text
+*.dot text
+*.gv text
+*.java text
+*.pl text
+*.php text
+*.rb text
+*.rs text
+*.lhs text
+*.vim text
+*.nvim text
+*.lua text
+*.sh text
+*.bash text
+*.svg text
+*.html text
+*.css text
+*.scss text
+*.md text
+*.rst text
+*.txt text
+*.wiki text
+
+# Declare files that should have CRLF line endings on checkout.
+*.cs eol=crlf
+*.ps1 eol=crlf
+*.bat eol=crlf
+
+# Declare files that should have LF line endings on checkout.
+*.js eol=lf
+*.json eol=lf
+*.cpp eol=lf
+*.c eol=lf
+*.hpp eol=lf
+*.h eol=lf
+*.py eol=lf
+*.hs eol=lf
+*.tex eol=lf
+*.sty eol=lf
+*.cls eol=lf
+*.dot eol=lf
+*.gv eol=lf
+*.java eol=lf
+*.pl eol=lf
+*.php eol=lf
+*.rb eol=lf
+*.rs eol=lf
+*.lhs eol=lf
+*.vim eol=lf
+*.nvim eol=lf
+*.lua eol=lf
+*.sh eol=lf
+*.bash eol=lf
+*.svg eol=lf
+*.html eol=lf
+*.css eol=lf
+*.scss eol=lf
+*.md eol=lf
+*.rst eol=lf
+*.txt eol=lf
+*.wiki eol=lf
+
+# Declare files that are truly binary and shouldn't be modified.
+*.jpeg binary
+*.jpg binary
+*.png binary
+*.pdf binary
+*.jar binary
+*.mmdb binary

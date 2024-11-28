@@ -1,0 +1,239 @@
+use crate::lexer::{Token, LexicalError};
+use crate::ast;
+use rust_decimal::Decimal;
+
+grammar<'input>;
+
+pub Tree: ast::Node = {
+    Expression
+}
+
+Expression: ast::Node = {
+    #[precedence(level="2")] #[assoc(side="left")]
+    <left:Expression> "and" <right:Expression> => {
+        ast::Node::And(Box::new(left), Box::new(right))
+    },
+    #[precedence(level="2")] #[assoc(side="left")]
+    <left:Expression> "or" <right:Expression> => {
+        ast::Node::Or(Box::new(left), Box::new(right))
+    },
+    #[precedence(level="1")]
+    "(" <expression:Expression> ")" => expression,
+    NumericExpression,
+    #[precedence(level="1")]
+    EqualityExpression,
+    #[precedence(level="1")]
+    NullExpression,
+    #[precedence(level="1")]
+    ListExpression,
+    #[precedence(level="1")]
+    SetExpression,
+    #[precedence(level="1")]
+    "not" <expression:Expression> => ast::Node::Not(Box::new(expression)),
+    #[precedence(level="0")]
+    <variable:"identifier"> => ast::Node::Value(ast::Predicate {
+        attribute: variable.to_string(),
+        kind: ast::PredicateKind::Variable,
+    }),
+}
+
+NumericExpression: ast::Node = {
+    <left:"identifier"> "<" <right:NumericValue> => {
+        ast::Node::Value(ast::Predicate {
+            attribute: left.to_string(),
+            kind: ast::PredicateKind::Comparison(ast::comparison::Operator::LessThan, right)
+        })
+    },
+    <left:"identifier"> "<=" <right:NumericValue> => {
+        ast::Node::Value(ast::Predicate {
+            attribute: left.to_string(),
+            kind: ast::PredicateKind::Comparison(ast::comparison::Operator::LessThanEqual, right)
+        })
+    },
+    <left:"identifier"> ">" <right:NumericValue> => {
+        ast::Node::Value(ast::Predicate {
+            attribute: left.to_string(),
+            kind: ast::PredicateKind::Comparison(ast::comparison::Operator::GreaterThan, right)
+        })
+    },
+    <left:"identifier"> ">=" <right:NumericValue> => {
+        ast::Node::Value(ast::Predicate {
+            attribute: left.to_string(),
+            kind: ast::PredicateKind::Comparison(ast::comparison::Operator::GreaterThanEqual, right)
+        })
+    },
+    <left:NumericValue> "<" <right:"identifier"> => {
+        ast::Node::Value(ast::Predicate {
+            attribute: right.to_string(),
+            kind: ast::PredicateKind::Comparison(ast::comparison::Operator::GreaterThan, left)
+        })
+    },
+    <left:NumericValue> "<=" <right:"identifier"> => {
+        ast::Node::Value(ast::Predicate {
+            attribute: right.to_string(),
+            kind: ast::PredicateKind::Comparison(ast::comparison::Operator::GreaterThanEqual, left)
+        })
+    },
+    <left:NumericValue> ">" <right:"identifier"> => {
+        ast::Node::Value(ast::Predicate {
+            attribute: right.to_string(),
+            kind: ast::PredicateKind::Comparison(ast::comparison::Operator::LessThan, left)
+        })
+    },
+    <left:NumericValue> ">=" <right:"identifier"> => {
+        ast::Node::Value(ast::Predicate {
+            attribute: right.to_string(),
+            kind: ast::PredicateKind::Comparison(ast::comparison::Operator::LessThanEqual, left)
+        })
+    },
+}
+
+NumericValue: ast::comparison::Value = {
+    <value:"integer"> => ast::comparison::Value::Integer(value),
+    <value:"float"> => ast::comparison::Value::Float(value),
+}
+
+EqualityExpression: ast::Node = {
+    <left:"identifier"> "=" <right:PrimitiveLiteral> => {
+        ast::Node::Value(ast::Predicate {
+            attribute: left.to_string(),
+            kind: ast::PredicateKind::Equality(ast::equality::Operator::Equal, right)
+        })
+    },
+    <left:"identifier"> "<>" <right:PrimitiveLiteral> => {
+        ast::Node::Value(ast::Predicate {
+            attribute: left.to_string(),
+            kind: ast::PredicateKind::Equality(ast::equality::Operator::NotEqual, right)
+        })
+    },
+    <left:PrimitiveLiteral> "=" <right:"identifier"> => {
+        ast::Node::Value(ast::Predicate {
+            attribute: right.to_string(),
+            kind: ast::PredicateKind::Equality(ast::equality::Operator::Equal, left)
+        })
+    },
+    <left:PrimitiveLiteral> "<>" <right:"identifier"> => {
+        ast::Node::Value(ast::Predicate {
+            attribute: right.to_string(),
+            kind: ast::PredicateKind::Equality(ast::equality::Operator::NotEqual, left)
+        })
+    }
+}
+
+PrimitiveLiteral: ast::PrimitiveLiteral = {
+    <value:"integer"> => ast::PrimitiveLiteral::Integer(value),
+    <value:"float"> => ast::PrimitiveLiteral::Float(value),
+    <value:"string"> => ast::PrimitiveLiteral::String(value.to_string()),
+}
+
+NullExpression: ast::Node = {
+    <left:"identifier"> "is_null" => {
+        ast::Node::Value(ast::Predicate {
+            attribute: left.to_string(),
+            kind: ast::PredicateKind::Null(ast::null::Operator::IsNull)
+        })
+    },
+    <left:"identifier"> "is_not_null" => {
+        ast::Node::Value(ast::Predicate {
+            attribute: left.to_string(),
+            kind: ast::PredicateKind::Null(ast::null::Operator::IsNotNull)
+        })
+    },
+    <left:"identifier"> "is_empty" => {
+        ast::Node::Value(ast::Predicate {
+            attribute: left.to_string(),
+            kind: ast::PredicateKind::Null(ast::null::Operator::IsEmpty)
+        })
+    }
+}
+
+ListExpression: ast::Node = {
+    <left:"identifier"> "one_of" <list:ListLiteral> => {
+        ast::Node::Value(ast::Predicate {
+            attribute: left.to_string(),
+            kind: ast::PredicateKind::List(ast::list::Operator::OneOf, list)
+        })
+    },
+    <left:"identifier"> "all_of" <list:ListLiteral> => {
+        ast::Node::Value(ast::Predicate {
+            attribute: left.to_string(),
+            kind: ast::PredicateKind::List(ast::list::Operator::AllOf, list)
+        })
+    },
+    <left:"identifier"> "none_of" <list:ListLiteral> => {
+        ast::Node::Value(ast::Predicate {
+            attribute: left.to_string(),
+            kind: ast::PredicateKind::List(ast::list::Operator::NoneOf, list)
+        })
+    }
+}
+
+SetExpression: ast::Node = {
+    <left:"identifier"> "in" <list:ListLiteral> => {
+        ast::Node::Value(ast::Predicate {
+            attribute: left.to_string(),
+            kind: ast::PredicateKind::Set(ast::set::Operator::In, list)
+        })
+    },
+    <left:"identifier"> "not_in" <list:ListLiteral> => {
+        ast::Node::Value(ast::Predicate {
+            attribute: left.to_string(),
+            kind: ast::PredicateKind::Set(ast::set::Operator::NotIn, list)
+        })
+    },
+}
+
+ListLiteral: ast::ListLiteral = {
+    <values:List<"integer">> => ast::ListLiteral::IntegerList(values),
+    <values:List<"string">> => ast::ListLiteral::StringList(
+        values.iter().map(|value| value.to_string()).collect()
+    )
+
+}
+
+List<T>: Vec<T> = {
+    "(" <values:Comma<T>> ")" => values,
+}
+
+Comma<T>: Vec<T> = {
+    <value:T> => {
+        vec![value]
+    },
+    <mut values:(<T> ",")+> <entry:T> => {
+        values.push(entry);
+        values
+    }
+}
+
+extern {
+    type Location = usize;
+    type Error = LexicalError;
+
+    enum Token<'input> {
+        "(" => Token::LeftParenthesis,
+        ")" => Token::RightParenthesis,
+        "," => Token::Comma,
+        "<" => Token::LessThan,
+        "<=" => Token::LessThanEqual,
+        ">" => Token::GreaterThan,
+        ">=" => Token::GreaterThanEqual,
+        "not" => Token::Not,
+        "=" => Token::Equal,
+        "<>" => Token::NotEqual,
+        "in" => Token::In,
+        "not_in" => Token::NotIn,
+        "one_of" => Token::OneOf,
+        "none_of" => Token::NoneOf,
+        "all_of" => Token::AllOf,
+        "is_null" => Token::IsNull,
+        "is_not_null" => Token::IsNotNull,
+        "is_empty" => Token::IsEmpty,
+        "and" => Token::And,
+        "or" => Token::Or,
+        "integer" => Token::IntegerLiteral(<i64>),
+        "string" => Token::StringLiteral(<&'input str>),
+        "float" => Token::FloatLiteral(<Decimal>),
+        "boolean" => Token::BooleanLiteral(<bool>),
+        "identifier" => Token::Identifier(<&'input str>)
+    }
+}

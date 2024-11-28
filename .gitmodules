@@ -1,0 +1,6 @@
+[submodule "crates/textglass-sys/textglass"]
+	path = crates/textglass-sys/textglass
+	url = https://github.com/TextGlass/c.git
+[submodule "crates/betree-sys/betree"]
+	path = crates/betree-sys/betree
+	url = https://github.com/FrankBro/be-tree.git

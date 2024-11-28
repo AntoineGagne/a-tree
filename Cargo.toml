@@ -1,0 +1,22 @@
+[package]
+name = "a-tree"
+version = "0.1.0"
+edition = "2021"
+build = "build.rs"
+
+[[bench]]
+name = "benchmarks"
+harness = false
+
+[build-dependencies]
+lalrpop = "0.22.0"
+
+[dependencies]
+lalrpop-util = { version = "0.21.0", features = ["lexer", "unicode"] }
+logos = "0.14.2"
+rust_decimal = "1.36"
+thiserror = "1.0"
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports", "async_tokio"] }
+proptest = "1.5"

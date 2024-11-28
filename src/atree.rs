@@ -30,7 +30,7 @@ pub struct ATree {
     attributes: AttributeTable,
 }
 
-pub enum ATreeNode {
+enum ATreeNode {
     LNode {
         id: usize,
         parents: Vec<usize>,
@@ -59,8 +59,8 @@ impl ATreeNode {
 }
 
 pub struct Predicate {
-    pub attribute: AttributeIndex,
-    pub kind: PredicateKind,
+    attribute: AttributeIndex,
+    kind: PredicateKind,
 }
 
 impl Predicate {
@@ -202,9 +202,8 @@ impl<'a> EventBuilder<'a> {
     }
 
     pub fn with_string_list(&mut self, name: &str, values: &[&str]) -> Result<(), ATreeError> {
-        // TODO: Investigate this as this might be problematic with `all of` expression
         self.add_value(name, || {
-            AttributeValue::StringList(values.iter().filter_map(|v| self.strings.get(v)).collect())
+            AttributeValue::StringList(values.iter().map(|v| self.strings.get(v)).collect())
         })
     }
 
@@ -227,7 +226,7 @@ enum AttributeValue {
     Boolean(bool),
     Integer(i64),
     Float(Decimal),
-    String(Option<StringId>),
+    String(StringId),
     IntegerList(Vec<i64>),
     StringList(Vec<StringId>),
 }
@@ -238,16 +237,22 @@ struct StringTable {
 }
 
 impl StringTable {
+    const SENTINEL_ID: usize = 0;
+
     fn new() -> Self {
         Self {
             by_values: HashMap::new(),
-            counter: 0,
+            counter: 1,
         }
     }
 
-    fn get(&self, value: &str) -> Option<StringId> {
-        let index = self.by_values.get(value)?;
-        Some(StringId(*index))
+    fn get(&self, value: &str) -> StringId {
+        let index = self
+            .by_values
+            .get(value)
+            .cloned()
+            .unwrap_or(Self::SENTINEL_ID);
+        StringId(index)
     }
 
     fn get_or_update(&mut self, value: &str) -> StringId {

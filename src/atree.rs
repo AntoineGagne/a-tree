@@ -81,11 +81,11 @@ impl Predicate {
                         AttributeKind::Integer,
                     ) => Ok(id),
                     (
-                        PredicateKind::Comparison(_, comparison::Value::Integer(_)),
+                        PredicateKind::Comparison(_, ComparisonValue::Integer(_)),
                         AttributeKind::Integer,
                     ) => Ok(id),
                     (
-                        PredicateKind::Comparison(_, comparison::Value::Float(_)),
+                        PredicateKind::Comparison(_, ComparisonValue::Float(_)),
                         AttributeKind::Float,
                     ) => Ok(id),
                     (
@@ -108,6 +108,7 @@ impl Predicate {
                         PredicateKind::List(_, ListLiteral::StringList(_)),
                         AttributeKind::StringList,
                     ) => Ok(id),
+                    (PredicateKind::Variable, AttributeKind::Boolean) => Ok(id),
                     (actual, expected) => Err(ATreeError::MismatchingTypes {
                         name: ast.attribute.clone(),
                         expected,
@@ -162,7 +163,7 @@ pub struct EventBuilder<'a> {
 }
 
 impl<'a> EventBuilder<'a> {
-    fn new(attributes: &'a AttributeTable, strings: &'a StringTable) -> Self {
+    pub fn new(attributes: &'a AttributeTable, strings: &'a StringTable) -> Self {
         Self {
             attributes,
             strings,
@@ -170,7 +171,7 @@ impl<'a> EventBuilder<'a> {
         }
     }
 
-    fn build(mut self) -> Result<Event, ATreeError<'a>> {
+    pub fn build(mut self) -> Result<Event, ATreeError<'a>> {
         if self.by_ids.len() != self.attributes.len() {
             return Err(ATreeError::MissingAttributes);
         }

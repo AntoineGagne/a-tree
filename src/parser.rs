@@ -19,7 +19,7 @@ pub fn parse(input: &str) -> Result<Node, ATreeParseError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ast::{ListLiteral, Node, Predicate, PredicateKind, PrimitiveLiteral};
+    use crate::ast::*;
 
     #[test]
     fn return_an_error_on_empty_input() {
@@ -37,14 +37,17 @@ mod tests {
 
     #[test]
     fn can_parse_less_than_expression_with_left_identifier() {
-        use crate::ast::comparison::{Operator, Value};
+        use crate::ast::{ComparisonOperator, ComparisonValue};
 
         let parsed = parse("price < 15");
 
         assert_eq!(
             Ok(Node::Value(Predicate {
                 attribute: "price".to_string(),
-                kind: PredicateKind::Comparison(Operator::LessThan, Value::Integer(15))
+                kind: PredicateKind::Comparison(
+                    ComparisonOperator::LessThan,
+                    ComparisonValue::Integer(15)
+                )
             })),
             parsed
         );
@@ -52,14 +55,17 @@ mod tests {
 
     #[test]
     fn can_parse_less_than_expression_with_right_identifier() {
-        use crate::ast::comparison::{Operator, Value};
+        use crate::ast::{ComparisonOperator, ComparisonValue};
 
         let parsed = parse("15 < price");
 
         assert_eq!(
             Ok(Node::Value(Predicate {
                 attribute: "price".to_string(),
-                kind: PredicateKind::Comparison(Operator::GreaterThan, Value::Integer(15))
+                kind: PredicateKind::Comparison(
+                    ComparisonOperator::GreaterThan,
+                    ComparisonValue::Integer(15)
+                )
             })),
             parsed
         );
@@ -67,14 +73,17 @@ mod tests {
 
     #[test]
     fn can_parse_less_than_equal_expression_with_left_identifier() {
-        use crate::ast::comparison::{Operator, Value};
+        use crate::ast::{ComparisonOperator, ComparisonValue};
 
         let parsed = parse("price <= 15");
 
         assert_eq!(
             Ok(Node::Value(Predicate {
                 attribute: "price".to_string(),
-                kind: PredicateKind::Comparison(Operator::LessThanEqual, Value::Integer(15))
+                kind: PredicateKind::Comparison(
+                    ComparisonOperator::LessThanEqual,
+                    ComparisonValue::Integer(15)
+                )
             })),
             parsed
         );
@@ -82,14 +91,17 @@ mod tests {
 
     #[test]
     fn can_parse_less_than_equal_expression_with_right_identifier() {
-        use crate::ast::comparison::{Operator, Value};
+        use crate::ast::{ComparisonOperator, ComparisonValue};
 
         let parsed = parse("15 <= price");
 
         assert_eq!(
             Ok(Node::Value(Predicate {
                 attribute: "price".to_string(),
-                kind: PredicateKind::Comparison(Operator::GreaterThanEqual, Value::Integer(15))
+                kind: PredicateKind::Comparison(
+                    ComparisonOperator::GreaterThanEqual,
+                    ComparisonValue::Integer(15)
+                )
             })),
             parsed
         );
@@ -97,14 +109,17 @@ mod tests {
 
     #[test]
     fn can_parse_greater_than_expression_with_left_identifier() {
-        use crate::ast::comparison::{Operator, Value};
+        use crate::ast::{ComparisonOperator, ComparisonValue};
 
         let parsed = parse("price > 15");
 
         assert_eq!(
             Ok(Node::Value(Predicate {
                 attribute: "price".to_string(),
-                kind: PredicateKind::Comparison(Operator::GreaterThan, Value::Integer(15))
+                kind: PredicateKind::Comparison(
+                    ComparisonOperator::GreaterThan,
+                    ComparisonValue::Integer(15)
+                )
             })),
             parsed
         );
@@ -112,14 +127,17 @@ mod tests {
 
     #[test]
     fn can_parse_greater_than_equal_expression_with_left_identifier() {
-        use crate::ast::comparison::{Operator, Value};
+        use crate::ast::{ComparisonOperator, ComparisonValue};
 
         let parsed = parse("price >= 15");
 
         assert_eq!(
             Ok(Node::Value(Predicate {
                 attribute: "price".to_string(),
-                kind: PredicateKind::Comparison(Operator::GreaterThanEqual, Value::Integer(15))
+                kind: PredicateKind::Comparison(
+                    ComparisonOperator::GreaterThanEqual,
+                    ComparisonValue::Integer(15)
+                )
             })),
             parsed
         );
@@ -127,14 +145,17 @@ mod tests {
 
     #[test]
     fn can_parse_greater_expression_with_right_identifier() {
-        use crate::ast::comparison::{Operator, Value};
+        use crate::ast::{ComparisonOperator, ComparisonValue};
 
         let parsed = parse("15 > price");
 
         assert_eq!(
             Ok(Node::Value(Predicate {
                 attribute: "price".to_string(),
-                kind: PredicateKind::Comparison(Operator::LessThan, Value::Integer(15))
+                kind: PredicateKind::Comparison(
+                    ComparisonOperator::LessThan,
+                    ComparisonValue::Integer(15)
+                )
             })),
             parsed
         );
@@ -142,14 +163,17 @@ mod tests {
 
     #[test]
     fn can_parse_greater_than_equal_expression_with_right_identifier() {
-        use crate::ast::comparison::{Operator, Value};
+        use crate::ast::{ComparisonOperator, ComparisonValue};
 
         let parsed = parse("15 >= price");
 
         assert_eq!(
             Ok(Node::Value(Predicate {
                 attribute: "price".to_string(),
-                kind: PredicateKind::Comparison(Operator::LessThanEqual, Value::Integer(15))
+                kind: PredicateKind::Comparison(
+                    ComparisonOperator::LessThanEqual,
+                    ComparisonValue::Integer(15)
+                )
             })),
             parsed
         );
@@ -157,14 +181,17 @@ mod tests {
 
     #[test]
     fn can_parse_equal_expression_with_left_identifier() {
-        use crate::ast::equality::Operator;
+        use crate::ast::EqualityOperator;
 
         let parsed = parse("exchange_id = 1");
 
         assert_eq!(
             Ok(Node::Value(Predicate {
                 attribute: "exchange_id".to_string(),
-                kind: PredicateKind::Equality(Operator::Equal, PrimitiveLiteral::Integer(1))
+                kind: PredicateKind::Equality(
+                    EqualityOperator::Equal,
+                    PrimitiveLiteral::Integer(1)
+                )
             })),
             parsed
         );
@@ -172,14 +199,17 @@ mod tests {
 
     #[test]
     fn can_parse_equal_expression_with_right_identifier() {
-        use crate::ast::equality::Operator;
+        use crate::ast::EqualityOperator;
 
         let parsed = parse("1 = exchange_id");
 
         assert_eq!(
             Ok(Node::Value(Predicate {
                 attribute: "exchange_id".to_string(),
-                kind: PredicateKind::Equality(Operator::Equal, PrimitiveLiteral::Integer(1))
+                kind: PredicateKind::Equality(
+                    EqualityOperator::Equal,
+                    PrimitiveLiteral::Integer(1)
+                )
             })),
             parsed
         );
@@ -187,14 +217,17 @@ mod tests {
 
     #[test]
     fn can_parse_not_equal_expression_with_left_identifier() {
-        use crate::ast::equality::Operator;
+        use crate::ast::EqualityOperator;
 
         let parsed = parse("exchange_id <> 1");
 
         assert_eq!(
             Ok(Node::Value(Predicate {
                 attribute: "exchange_id".to_string(),
-                kind: PredicateKind::Equality(Operator::NotEqual, PrimitiveLiteral::Integer(1))
+                kind: PredicateKind::Equality(
+                    EqualityOperator::NotEqual,
+                    PrimitiveLiteral::Integer(1)
+                )
             })),
             parsed
         );
@@ -202,14 +235,17 @@ mod tests {
 
     #[test]
     fn can_parse_not_equal_expression_with_right_identifier() {
-        use crate::ast::equality::Operator;
+        use crate::ast::EqualityOperator;
 
         let parsed = parse("1 <> exchange_id");
 
         assert_eq!(
             Ok(Node::Value(Predicate {
                 attribute: "exchange_id".to_string(),
-                kind: PredicateKind::Equality(Operator::NotEqual, PrimitiveLiteral::Integer(1))
+                kind: PredicateKind::Equality(
+                    EqualityOperator::NotEqual,
+                    PrimitiveLiteral::Integer(1)
+                )
             })),
             parsed
         );
@@ -217,14 +253,14 @@ mod tests {
 
     #[test]
     fn can_parse_is_null_expression() {
-        use crate::ast::null::Operator;
+        use crate::ast::NullOperator;
 
         let parsed = parse("exchange_id is null");
 
         assert_eq!(
             Ok(Node::Value(Predicate {
                 attribute: "exchange_id".to_string(),
-                kind: PredicateKind::Null(Operator::IsNull)
+                kind: PredicateKind::Null(NullOperator::IsNull)
             })),
             parsed
         );
@@ -232,14 +268,14 @@ mod tests {
 
     #[test]
     fn can_parse_is_not_null_expression() {
-        use crate::ast::null::Operator;
+        use crate::ast::NullOperator;
 
         let parsed = parse("exchange_id is not null");
 
         assert_eq!(
             Ok(Node::Value(Predicate {
                 attribute: "exchange_id".to_string(),
-                kind: PredicateKind::Null(Operator::IsNotNull)
+                kind: PredicateKind::Null(NullOperator::IsNotNull)
             })),
             parsed
         );
@@ -247,14 +283,14 @@ mod tests {
 
     #[test]
     fn can_parse_is_empty_expression() {
-        use crate::ast::null::Operator;
+        use crate::ast::NullOperator;
 
         let parsed = parse("deals is empty");
 
         assert_eq!(
             Ok(Node::Value(Predicate {
                 attribute: "deals".to_string(),
-                kind: PredicateKind::Null(Operator::IsEmpty)
+                kind: PredicateKind::Null(NullOperator::IsEmpty)
             })),
             parsed
         );
@@ -269,14 +305,14 @@ mod tests {
 
     #[test]
     fn can_parse_one_of_list_expression_with_single_element_integer_list() {
-        use crate::ast::list::Operator;
+        use crate::ast::ListOperator;
 
         let parsed = parse("ids one of (1)");
 
         assert_eq!(
             Ok(Node::Value(Predicate {
                 attribute: "ids".to_string(),
-                kind: PredicateKind::List(Operator::OneOf, ListLiteral::IntegerList(vec![1]))
+                kind: PredicateKind::List(ListOperator::OneOf, ListLiteral::IntegerList(vec![1]))
             })),
             parsed
         );
@@ -284,14 +320,17 @@ mod tests {
 
     #[test]
     fn can_parse_one_of_list_expression_with_integer_list() {
-        use crate::ast::list::Operator;
+        use crate::ast::ListOperator;
 
         let parsed = parse("ids one of (1, 2, 3)");
 
         assert_eq!(
             Ok(Node::Value(Predicate {
                 attribute: "ids".to_string(),
-                kind: PredicateKind::List(Operator::OneOf, ListLiteral::IntegerList(vec![1, 2, 3]))
+                kind: PredicateKind::List(
+                    ListOperator::OneOf,
+                    ListLiteral::IntegerList(vec![1, 2, 3])
+                )
             })),
             parsed
         );
@@ -299,7 +338,7 @@ mod tests {
 
     #[test]
     fn can_parse_one_of_list_expression_with_single_element_string_list() {
-        use crate::ast::list::Operator;
+        use crate::ast::ListOperator;
 
         let parsed = parse(r##"deals one of ("deal-1")"##);
 
@@ -307,7 +346,7 @@ mod tests {
             Ok(Node::Value(Predicate {
                 attribute: "deals".to_string(),
                 kind: PredicateKind::List(
-                    Operator::OneOf,
+                    ListOperator::OneOf,
                     ListLiteral::StringList(vec!["deal-1".to_string(),])
                 )
             })),
@@ -317,7 +356,7 @@ mod tests {
 
     #[test]
     fn can_parse_one_of_list_expression_with_string_list() {
-        use crate::ast::list::Operator;
+        use crate::ast::ListOperator;
 
         let parsed = parse(r##"deals one of ("deal-1", "deal-2", "deal-3")"##);
 
@@ -325,7 +364,7 @@ mod tests {
             Ok(Node::Value(Predicate {
                 attribute: "deals".to_string(),
                 kind: PredicateKind::List(
-                    Operator::OneOf,
+                    ListOperator::OneOf,
                     ListLiteral::StringList(vec![
                         "deal-1".to_string(),
                         "deal-2".to_string(),
@@ -339,14 +378,17 @@ mod tests {
 
     #[test]
     fn can_parse_all_of_list_expression_with_integer_list() {
-        use crate::ast::list::Operator;
+        use crate::ast::ListOperator;
 
         let parsed = parse("ids all of (1, 2, 3)");
 
         assert_eq!(
             Ok(Node::Value(Predicate {
                 attribute: "ids".to_string(),
-                kind: PredicateKind::List(Operator::AllOf, ListLiteral::IntegerList(vec![1, 2, 3]))
+                kind: PredicateKind::List(
+                    ListOperator::AllOf,
+                    ListLiteral::IntegerList(vec![1, 2, 3])
+                )
             })),
             parsed
         );
@@ -354,7 +396,7 @@ mod tests {
 
     #[test]
     fn can_parse_all_of_list_expression_with_string_list() {
-        use crate::ast::list::Operator;
+        use crate::ast::ListOperator;
 
         let parsed = parse(r##"deals all of ("deal-1", "deal-2", "deal-3")"##);
 
@@ -362,7 +404,7 @@ mod tests {
             Ok(Node::Value(Predicate {
                 attribute: "deals".to_string(),
                 kind: PredicateKind::List(
-                    Operator::AllOf,
+                    ListOperator::AllOf,
                     ListLiteral::StringList(vec![
                         "deal-1".to_string(),
                         "deal-2".to_string(),
@@ -376,7 +418,7 @@ mod tests {
 
     #[test]
     fn can_parse_none_of_list_expression_with_integer_list() {
-        use crate::ast::list::Operator;
+        use crate::ast::ListOperator;
 
         let parsed = parse("ids none of (1, 2, 3)");
 
@@ -384,7 +426,7 @@ mod tests {
             Ok(Node::Value(Predicate {
                 attribute: "ids".to_string(),
                 kind: PredicateKind::List(
-                    Operator::NoneOf,
+                    ListOperator::NoneOf,
                     ListLiteral::IntegerList(vec![1, 2, 3])
                 )
             })),
@@ -394,7 +436,7 @@ mod tests {
 
     #[test]
     fn can_parse_none_of_list_expression_with_string_list() {
-        use crate::ast::list::Operator;
+        use crate::ast::ListOperator;
 
         let parsed = parse(r##"deals none of ("deal-1", "deal-2", "deal-3")"##);
 
@@ -402,7 +444,7 @@ mod tests {
             Ok(Node::Value(Predicate {
                 attribute: "deals".to_string(),
                 kind: PredicateKind::List(
-                    Operator::NoneOf,
+                    ListOperator::NoneOf,
                     ListLiteral::StringList(vec![
                         "deal-1".to_string(),
                         "deal-2".to_string(),
@@ -416,7 +458,7 @@ mod tests {
 
     #[test]
     fn can_parse_an_expression_enclosed_in_parenthesis() {
-        use crate::ast::list::Operator;
+        use crate::ast::ListOperator;
 
         let parsed = parse(r##"(deals none of ("deal-1", "deal-2", "deal-3"))"##);
 
@@ -424,7 +466,7 @@ mod tests {
             Ok(Node::Value(Predicate {
                 attribute: "deals".to_string(),
                 kind: PredicateKind::List(
-                    Operator::NoneOf,
+                    ListOperator::NoneOf,
                     ListLiteral::StringList(vec![
                         "deal-1".to_string(),
                         "deal-2".to_string(),
@@ -445,7 +487,7 @@ mod tests {
 
     #[test]
     fn can_parse_in_expression() {
-        use crate::ast::set::Operator;
+        use crate::ast::SetOperator;
 
         let parsed = parse(r##"deal in ("deal-1", "deal-2", "deal-3")"##);
 
@@ -453,7 +495,7 @@ mod tests {
             Ok(Node::Value(Predicate {
                 attribute: "deal".to_string(),
                 kind: PredicateKind::Set(
-                    Operator::In,
+                    SetOperator::In,
                     ListLiteral::StringList(vec![
                         "deal-1".to_string(),
                         "deal-2".to_string(),
@@ -467,14 +509,17 @@ mod tests {
 
     #[test]
     fn can_parse_not_in_expression() {
-        use crate::ast::set::Operator;
+        use crate::ast::SetOperator;
 
         let parsed = parse(r##"exchange_id not in (1, 2, 3)"##);
 
         assert_eq!(
             Ok(Node::Value(Predicate {
                 attribute: "exchange_id".to_string(),
-                kind: PredicateKind::Set(Operator::NotIn, ListLiteral::IntegerList(vec![1, 2, 3]))
+                kind: PredicateKind::Set(
+                    SetOperator::NotIn,
+                    ListLiteral::IntegerList(vec![1, 2, 3])
+                )
             })),
             parsed
         );
@@ -489,7 +534,7 @@ mod tests {
 
     #[test]
     fn can_parse_binary_and_expression() {
-        use crate::ast::list::Operator;
+        use crate::ast::ListOperator;
 
         let parsed = parse(
             r##"deal_ids none of ("deal-2", "deal-4") and deal_ids one of ("deal-1", "deal-3")"##,
@@ -500,14 +545,14 @@ mod tests {
                 Box::new(Node::Value(Predicate {
                     attribute: "deal_ids".to_string(),
                     kind: PredicateKind::List(
-                        Operator::NoneOf,
+                        ListOperator::NoneOf,
                         ListLiteral::StringList(vec!["deal-2".to_string(), "deal-4".to_string()])
                     )
                 })),
                 Box::new(Node::Value(Predicate {
                     attribute: "deal_ids".to_string(),
                     kind: PredicateKind::List(
-                        Operator::OneOf,
+                        ListOperator::OneOf,
                         ListLiteral::StringList(vec!["deal-1".to_string(), "deal-3".to_string()])
                     )
                 }))
@@ -529,7 +574,7 @@ mod tests {
                     Box::new(Node::Value(Predicate {
                         attribute: "exchange_id".to_string(),
                         kind: PredicateKind::Equality(
-                            equality::Operator::Equal,
+                            EqualityOperator::Equal,
                             PrimitiveLiteral::Integer(1)
                         )
                     })),
@@ -541,7 +586,7 @@ mod tests {
                 Box::new(Node::Value(Predicate {
                     attribute: "deal_ids".to_string(),
                     kind: PredicateKind::List(
-                        list::Operator::NoneOf,
+                        ListOperator::NoneOf,
                         ListLiteral::StringList(vec!["deal-2".to_string(), "deal-4".to_string()])
                     )
                 }))
@@ -565,7 +610,7 @@ mod tests {
                         Box::new(Node::Value(Predicate {
                             attribute: "exchange_id".to_string(),
                             kind: PredicateKind::Equality(
-                                equality::Operator::Equal,
+                                EqualityOperator::Equal,
                                 PrimitiveLiteral::Integer(1)
                             )
                         })),
@@ -577,7 +622,7 @@ mod tests {
                     Box::new(Node::Value(Predicate {
                         attribute: "deal_ids".to_string(),
                         kind: PredicateKind::List(
-                            list::Operator::NoneOf,
+                            ListOperator::NoneOf,
                             ListLiteral::StringList(vec![
                                 "deal-2".to_string(),
                                 "deal-4".to_string()
@@ -588,7 +633,7 @@ mod tests {
                 Box::new(Node::Value(Predicate {
                     attribute: "deal_ids".to_string(),
                     kind: PredicateKind::List(
-                        list::Operator::OneOf,
+                        ListOperator::OneOf,
                         ListLiteral::StringList(vec!["deal-1".to_string(), "deal-3".to_string()])
                     )
                 }))
@@ -599,7 +644,7 @@ mod tests {
 
     #[test]
     fn can_parse_binary_or_expression() {
-        use crate::ast::list::Operator;
+        use crate::ast::ListOperator;
 
         let parsed = parse(
             r##"deal_ids none of ("deal-2", "deal-4") or deal_ids one of ("deal-1", "deal-3")"##,
@@ -610,14 +655,14 @@ mod tests {
                 Box::new(Node::Value(Predicate {
                     attribute: "deal_ids".to_string(),
                     kind: PredicateKind::List(
-                        Operator::NoneOf,
+                        ListOperator::NoneOf,
                         ListLiteral::StringList(vec!["deal-2".to_string(), "deal-4".to_string()])
                     )
                 })),
                 Box::new(Node::Value(Predicate {
                     attribute: "deal_ids".to_string(),
                     kind: PredicateKind::List(
-                        Operator::OneOf,
+                        ListOperator::OneOf,
                         ListLiteral::StringList(vec!["deal-1".to_string(), "deal-3".to_string()])
                     )
                 }))
@@ -639,7 +684,7 @@ mod tests {
                     Box::new(Node::Value(Predicate {
                         attribute: "exchange_id".to_string(),
                         kind: PredicateKind::Equality(
-                            equality::Operator::Equal,
+                            EqualityOperator::Equal,
                             PrimitiveLiteral::Integer(1)
                         )
                     })),
@@ -651,7 +696,7 @@ mod tests {
                 Box::new(Node::Value(Predicate {
                     attribute: "deal_ids".to_string(),
                     kind: PredicateKind::List(
-                        list::Operator::NoneOf,
+                        ListOperator::NoneOf,
                         ListLiteral::StringList(vec!["deal-2".to_string(), "deal-4".to_string()])
                     )
                 }))
@@ -675,7 +720,7 @@ mod tests {
                         Box::new(Node::Value(Predicate {
                             attribute: "exchange_id".to_string(),
                             kind: PredicateKind::Equality(
-                                equality::Operator::Equal,
+                                EqualityOperator::Equal,
                                 PrimitiveLiteral::Integer(1)
                             )
                         })),
@@ -687,7 +732,7 @@ mod tests {
                     Box::new(Node::Value(Predicate {
                         attribute: "deal_ids".to_string(),
                         kind: PredicateKind::List(
-                            list::Operator::NoneOf,
+                            ListOperator::NoneOf,
                             ListLiteral::StringList(vec![
                                 "deal-2".to_string(),
                                 "deal-4".to_string()
@@ -698,7 +743,7 @@ mod tests {
                 Box::new(Node::Value(Predicate {
                     attribute: "deal_ids".to_string(),
                     kind: PredicateKind::List(
-                        list::Operator::OneOf,
+                        ListOperator::OneOf,
                         ListLiteral::StringList(vec!["deal-1".to_string(), "deal-3".to_string()])
                     )
                 }))
@@ -709,14 +754,17 @@ mod tests {
 
     #[test]
     fn can_parse_negated_expression() {
-        use crate::ast::comparison::{Operator, Value};
+        use crate::ast::{ComparisonOperator, ComparisonValue};
 
         let parsed = parse(r##"not exchange_id > 2"##);
 
         assert_eq!(
             Ok(Node::Not(Box::new(Node::Value(Predicate {
                 attribute: "exchange_id".to_string(),
-                kind: PredicateKind::Comparison(Operator::GreaterThan, Value::Integer(2))
+                kind: PredicateKind::Comparison(
+                    ComparisonOperator::GreaterThan,
+                    ComparisonValue::Integer(2)
+                )
             })),)),
             parsed
         );
@@ -756,7 +804,7 @@ mod tests {
                                                 Box::new(Node::Value(Predicate {
                                                     attribute: "exchange_id".to_string(),
                                                     kind: PredicateKind::Equality(
-                                                        equality::Operator::Equal,
+                                                        EqualityOperator::Equal,
                                                         PrimitiveLiteral::Integer(1)
                                                     )
                                                 })),
@@ -768,7 +816,7 @@ mod tests {
                                             Box::new(Node::Value(Predicate {
                                                 attribute: "deal_ids".to_string(),
                                                 kind: PredicateKind::List(
-                                                    list::Operator::OneOf,
+                                                    ListOperator::OneOf,
                                                     ListLiteral::StringList(vec![
                                                         "deal-1".to_string(),
                                                         "deal-2".to_string()
@@ -779,7 +827,7 @@ mod tests {
                                         Box::new(Node::Value(Predicate {
                                             attribute: "exchange_id".to_string(),
                                             kind: PredicateKind::Equality(
-                                                equality::Operator::Equal,
+                                                EqualityOperator::Equal,
                                                 PrimitiveLiteral::Integer(2)
                                             )
                                         }))
@@ -792,7 +840,7 @@ mod tests {
                                 Box::new(Node::Value(Predicate {
                                     attribute: "deal_ids".to_string(),
                                     kind: PredicateKind::List(
-                                        list::Operator::OneOf,
+                                        ListOperator::OneOf,
                                         ListLiteral::StringList(vec![
                                             "deal-3".to_string(),
                                             "deal-4".to_string()
@@ -803,7 +851,7 @@ mod tests {
                             Box::new(Node::Value(Predicate {
                                 attribute: "segment_ids".to_string(),
                                 kind: PredicateKind::List(
-                                    list::Operator::OneOf,
+                                    ListOperator::OneOf,
                                     ListLiteral::IntegerList(vec![1, 2, 3, 4, 5, 6])
                                 )
                             }))
@@ -811,7 +859,7 @@ mod tests {
                         Box::new(Node::Value(Predicate {
                             attribute: "continent".to_string(),
                             kind: PredicateKind::Set(
-                                set::Operator::In,
+                                SetOperator::In,
                                 ListLiteral::StringList(vec!["NA".to_string()])
                             )
                         }))
@@ -819,7 +867,7 @@ mod tests {
                     Box::new(Node::Value(Predicate {
                         attribute: "country".to_string(),
                         kind: PredicateKind::Set(
-                            set::Operator::In,
+                            SetOperator::In,
                             ListLiteral::StringList(vec!["US".to_string(), "CA".to_string()])
                         )
                     }))
@@ -827,7 +875,7 @@ mod tests {
                 Box::new(Node::Value(Predicate {
                     attribute: "city".to_string(),
                     kind: PredicateKind::Set(
-                        set::Operator::In,
+                        SetOperator::In,
                         ListLiteral::StringList(vec!["QC".to_string(), "TN".to_string()])
                     )
                 }))

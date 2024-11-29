@@ -19,65 +19,53 @@ pub struct Predicate {
 #[derive(Hash, PartialEq, Clone, Debug)]
 pub enum PredicateKind {
     Variable,
-    Set(set::Operator, ListLiteral),
-    Comparison(comparison::Operator, comparison::Value),
-    Equality(equality::Operator, PrimitiveLiteral),
-    List(list::Operator, ListLiteral),
-    Null(null::Operator),
+    Set(SetOperator, ListLiteral),
+    Comparison(ComparisonOperator, ComparisonValue),
+    Equality(EqualityOperator, PrimitiveLiteral),
+    List(ListOperator, ListLiteral),
+    Null(NullOperator),
 }
 
-pub mod set {
-    #[derive(Hash, PartialEq, Clone, Debug)]
-    pub enum Operator {
-        NotIn,
-        In,
-    }
+#[derive(Hash, PartialEq, Clone, Debug)]
+pub enum SetOperator {
+    NotIn,
+    In,
 }
 
-pub mod comparison {
-    use rust_decimal::Decimal;
-
-    #[derive(Hash, PartialEq, Clone, Debug)]
-    pub enum Operator {
-        LessThan,
-        LessThanEqual,
-        GreaterThanEqual,
-        GreaterThan,
-    }
-
-    #[derive(Hash, PartialEq, Clone, Debug)]
-    pub enum Value {
-        Integer(i64),
-        Float(Decimal),
-    }
+#[derive(Hash, PartialEq, Clone, Debug)]
+pub enum ComparisonOperator {
+    LessThan,
+    LessThanEqual,
+    GreaterThanEqual,
+    GreaterThan,
 }
 
-pub mod equality {
-    #[derive(Hash, PartialEq, Clone, Debug)]
-    pub enum Operator {
-        Equal,
-        NotEqual,
-    }
+#[derive(Hash, PartialEq, Clone, Debug)]
+pub enum ComparisonValue {
+    Integer(i64),
+    Float(Decimal),
 }
 
-pub mod list {
-    #[derive(Hash, PartialEq, Clone, Debug)]
-    #[allow(clippy::enum_variant_names)]
-    pub enum Operator {
-        OneOf,
-        NoneOf,
-        AllOf,
-    }
+#[derive(Hash, PartialEq, Clone, Debug)]
+pub enum EqualityOperator {
+    Equal,
+    NotEqual,
 }
 
-pub mod null {
-    #[derive(Hash, PartialEq, Clone, Debug)]
-    #[allow(clippy::enum_variant_names)]
-    pub enum Operator {
-        IsNull,
-        IsNotNull,
-        IsEmpty,
-    }
+#[derive(Hash, PartialEq, Clone, Debug)]
+#[allow(clippy::enum_variant_names)]
+pub enum ListOperator {
+    OneOf,
+    NoneOf,
+    AllOf,
+}
+
+#[derive(Hash, PartialEq, Clone, Debug)]
+#[allow(clippy::enum_variant_names)]
+pub enum NullOperator {
+    IsNull,
+    IsNotNull,
+    IsEmpty,
 }
 
 #[derive(Hash, PartialEq, Clone, Debug)]

@@ -41,81 +41,81 @@ NumericExpression: ast::Node = {
     <left:"identifier"> "<" <right:NumericValue> => {
         ast::Node::Value(ast::Predicate {
             attribute: left.to_string(),
-            kind: ast::PredicateKind::Comparison(ast::comparison::Operator::LessThan, right)
+            kind: ast::PredicateKind::Comparison(ast::ComparisonOperator::LessThan, right)
         })
     },
     <left:"identifier"> "<=" <right:NumericValue> => {
         ast::Node::Value(ast::Predicate {
             attribute: left.to_string(),
-            kind: ast::PredicateKind::Comparison(ast::comparison::Operator::LessThanEqual, right)
+            kind: ast::PredicateKind::Comparison(ast::ComparisonOperator::LessThanEqual, right)
         })
     },
     <left:"identifier"> ">" <right:NumericValue> => {
         ast::Node::Value(ast::Predicate {
             attribute: left.to_string(),
-            kind: ast::PredicateKind::Comparison(ast::comparison::Operator::GreaterThan, right)
+            kind: ast::PredicateKind::Comparison(ast::ComparisonOperator::GreaterThan, right)
         })
     },
     <left:"identifier"> ">=" <right:NumericValue> => {
         ast::Node::Value(ast::Predicate {
             attribute: left.to_string(),
-            kind: ast::PredicateKind::Comparison(ast::comparison::Operator::GreaterThanEqual, right)
+            kind: ast::PredicateKind::Comparison(ast::ComparisonOperator::GreaterThanEqual, right)
         })
     },
     <left:NumericValue> "<" <right:"identifier"> => {
         ast::Node::Value(ast::Predicate {
             attribute: right.to_string(),
-            kind: ast::PredicateKind::Comparison(ast::comparison::Operator::GreaterThan, left)
+            kind: ast::PredicateKind::Comparison(ast::ComparisonOperator::GreaterThan, left)
         })
     },
     <left:NumericValue> "<=" <right:"identifier"> => {
         ast::Node::Value(ast::Predicate {
             attribute: right.to_string(),
-            kind: ast::PredicateKind::Comparison(ast::comparison::Operator::GreaterThanEqual, left)
+            kind: ast::PredicateKind::Comparison(ast::ComparisonOperator::GreaterThanEqual, left)
         })
     },
     <left:NumericValue> ">" <right:"identifier"> => {
         ast::Node::Value(ast::Predicate {
             attribute: right.to_string(),
-            kind: ast::PredicateKind::Comparison(ast::comparison::Operator::LessThan, left)
+            kind: ast::PredicateKind::Comparison(ast::ComparisonOperator::LessThan, left)
         })
     },
     <left:NumericValue> ">=" <right:"identifier"> => {
         ast::Node::Value(ast::Predicate {
             attribute: right.to_string(),
-            kind: ast::PredicateKind::Comparison(ast::comparison::Operator::LessThanEqual, left)
+            kind: ast::PredicateKind::Comparison(ast::ComparisonOperator::LessThanEqual, left)
         })
     },
 }
 
-NumericValue: ast::comparison::Value = {
-    <value:"integer"> => ast::comparison::Value::Integer(value),
-    <value:"float"> => ast::comparison::Value::Float(value),
+NumericValue: ast::ComparisonValue = {
+    <value:"integer"> => ast::ComparisonValue::Integer(value),
+    <value:"float"> => ast::ComparisonValue::Float(value),
 }
 
 EqualityExpression: ast::Node = {
     <left:"identifier"> "=" <right:PrimitiveLiteral> => {
         ast::Node::Value(ast::Predicate {
             attribute: left.to_string(),
-            kind: ast::PredicateKind::Equality(ast::equality::Operator::Equal, right)
+            kind: ast::PredicateKind::Equality(ast::EqualityOperator::Equal, right)
         })
     },
     <left:"identifier"> "<>" <right:PrimitiveLiteral> => {
         ast::Node::Value(ast::Predicate {
             attribute: left.to_string(),
-            kind: ast::PredicateKind::Equality(ast::equality::Operator::NotEqual, right)
+            kind: ast::PredicateKind::Equality(ast::EqualityOperator::NotEqual, right)
         })
     },
     <left:PrimitiveLiteral> "=" <right:"identifier"> => {
         ast::Node::Value(ast::Predicate {
             attribute: right.to_string(),
-            kind: ast::PredicateKind::Equality(ast::equality::Operator::Equal, left)
+            kind: ast::PredicateKind::Equality(ast::EqualityOperator::Equal, left)
         })
     },
     <left:PrimitiveLiteral> "<>" <right:"identifier"> => {
         ast::Node::Value(ast::Predicate {
             attribute: right.to_string(),
-            kind: ast::PredicateKind::Equality(ast::equality::Operator::NotEqual, left)
+            kind: ast::PredicateKind::Equality(ast::EqualityOperator::NotEqual, left)
         })
     }
 }
@@ -130,19 +130,19 @@ NullExpression: ast::Node = {
     <left:"identifier"> "is_null" => {
         ast::Node::Value(ast::Predicate {
             attribute: left.to_string(),
-            kind: ast::PredicateKind::Null(ast::null::Operator::IsNull)
+            kind: ast::PredicateKind::Null(ast::NullOperator::IsNull)
         })
     },
     <left:"identifier"> "is_not_null" => {
         ast::Node::Value(ast::Predicate {
             attribute: left.to_string(),
-            kind: ast::PredicateKind::Null(ast::null::Operator::IsNotNull)
+            kind: ast::PredicateKind::Null(ast::NullOperator::IsNotNull)
         })
     },
     <left:"identifier"> "is_empty" => {
         ast::Node::Value(ast::Predicate {
             attribute: left.to_string(),
-            kind: ast::PredicateKind::Null(ast::null::Operator::IsEmpty)
+            kind: ast::PredicateKind::Null(ast::NullOperator::IsEmpty)
         })
     }
 }
@@ -151,19 +151,19 @@ ListExpression: ast::Node = {
     <left:"identifier"> "one_of" <list:ListLiteral> => {
         ast::Node::Value(ast::Predicate {
             attribute: left.to_string(),
-            kind: ast::PredicateKind::List(ast::list::Operator::OneOf, list)
+            kind: ast::PredicateKind::List(ast::ListOperator::OneOf, list)
         })
     },
     <left:"identifier"> "all_of" <list:ListLiteral> => {
         ast::Node::Value(ast::Predicate {
             attribute: left.to_string(),
-            kind: ast::PredicateKind::List(ast::list::Operator::AllOf, list)
+            kind: ast::PredicateKind::List(ast::ListOperator::AllOf, list)
         })
     },
     <left:"identifier"> "none_of" <list:ListLiteral> => {
         ast::Node::Value(ast::Predicate {
             attribute: left.to_string(),
-            kind: ast::PredicateKind::List(ast::list::Operator::NoneOf, list)
+            kind: ast::PredicateKind::List(ast::ListOperator::NoneOf, list)
         })
     }
 }
@@ -172,13 +172,13 @@ SetExpression: ast::Node = {
     <left:"identifier"> "in" <list:ListLiteral> => {
         ast::Node::Value(ast::Predicate {
             attribute: left.to_string(),
-            kind: ast::PredicateKind::Set(ast::set::Operator::In, list)
+            kind: ast::PredicateKind::Set(ast::SetOperator::In, list)
         })
     },
     <left:"identifier"> "not_in" <list:ListLiteral> => {
         ast::Node::Value(ast::Predicate {
             attribute: left.to_string(),
-            kind: ast::PredicateKind::Set(ast::set::Operator::NotIn, list)
+            kind: ast::PredicateKind::Set(ast::SetOperator::NotIn, list)
         })
     },
 }

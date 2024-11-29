@@ -5,6 +5,8 @@ use thiserror::Error;
 pub enum ParserError {
     #[error("failed to lex the expression with {0:?}")]
     Lexical(LexicalError),
+    #[error("failed with {0:?}")]
+    Event(EventError),
 }
 
 #[derive(Debug, Error)]

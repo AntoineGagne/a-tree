@@ -5,6 +5,7 @@ mod error;
 mod events;
 mod lexer;
 mod parser;
+mod predicates;
 mod strings;
 
 pub use crate::{

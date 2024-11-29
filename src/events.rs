@@ -1,5 +1,5 @@
 use crate::{
-    ast::PredicateKind,
+    predicates::PredicateKind,
     strings::{StringId, StringTable},
 };
 use rust_decimal::Decimal;
@@ -108,7 +108,7 @@ pub struct AttributeTable {
     by_ids: Vec<AttributeKind>,
 }
 
-#[derive(Clone, Copy, Eq, Ord, PartialEq, PartialOrd, Debug)]
+#[derive(Clone, Copy, Eq, Ord, PartialEq, PartialOrd, Debug, Hash)]
 pub struct AttributeIndex(usize);
 
 impl AttributeTable {

@@ -1,11 +1,12 @@
 use crate::{
-    ast::{self, PredicateKind, *},
+    ast::{self, *},
     error::ATreeError,
     events::{
         AttributeDefinition, AttributeIndex, AttributeKind, AttributeTable, Event, EventBuilder,
         EventError,
     },
     parser,
+    predicates::Predicate,
     strings::StringTable,
 };
 
@@ -40,7 +41,8 @@ impl ATree {
     }
 
     pub fn insert<'a, 'tree: 'a>(&'tree mut self, abe: &'a str) -> Result<usize, ATreeError<'a>> {
-        let ast = parser::parse(abe, &mut self.strings).map_err(ATreeError::ParseError)?;
+        let ast = parser::parse(abe, &self.attributes, &mut self.strings)
+            .map_err(ATreeError::ParseError)?;
         ATreeNode::from_abe(self, ast)
     }
 
@@ -80,73 +82,6 @@ enum ATreeNode {
 impl ATreeNode {
     fn from_abe(a_tree: &mut ATree, abe: Node) -> Result<usize, ATreeError> {
         unimplemented!();
-    }
-}
-
-pub struct Predicate {
-    attribute: AttributeIndex,
-    kind: PredicateKind,
-}
-
-impl Predicate {
-    fn try_from<'a>(
-        attributes: &AttributeTable,
-        ast: &ast::Predicate,
-    ) -> Result<Self, ATreeError<'a>> {
-        attributes
-            .by_name(&ast.attribute)
-            .ok_or_else(|| {
-                ATreeError::Event(EventError::NonExistingAttribute(ast.attribute.clone()))
-            })
-            .and_then(|id| {
-                let id = match (&ast.kind, attributes.by_id(id)) {
-                    (PredicateKind::Set(_, ListLiteral::StringList(_)), AttributeKind::String) => {
-                        Ok(id)
-                    }
-                    (
-                        PredicateKind::Set(_, ListLiteral::IntegerList(_)),
-                        AttributeKind::Integer,
-                    ) => Ok(id),
-                    (
-                        PredicateKind::Comparison(_, ComparisonValue::Integer(_)),
-                        AttributeKind::Integer,
-                    ) => Ok(id),
-                    (
-                        PredicateKind::Comparison(_, ComparisonValue::Float(_)),
-                        AttributeKind::Float,
-                    ) => Ok(id),
-                    (
-                        PredicateKind::Equality(_, PrimitiveLiteral::Integer(_)),
-                        AttributeKind::Integer,
-                    ) => Ok(id),
-                    (
-                        PredicateKind::Equality(_, PrimitiveLiteral::Float(_)),
-                        AttributeKind::Float,
-                    ) => Ok(id),
-                    (
-                        PredicateKind::Equality(_, PrimitiveLiteral::String(_)),
-                        AttributeKind::String,
-                    ) => Ok(id),
-                    (
-                        PredicateKind::List(_, ListLiteral::IntegerList(_)),
-                        AttributeKind::IntegerList,
-                    ) => Ok(id),
-                    (
-                        PredicateKind::List(_, ListLiteral::StringList(_)),
-                        AttributeKind::StringList,
-                    ) => Ok(id),
-                    (PredicateKind::Variable, AttributeKind::Boolean) => Ok(id),
-                    (actual, expected) => Err(ATreeError::Event(EventError::MismatchingTypes {
-                        name: ast.attribute.clone(),
-                        expected,
-                        actual: actual.clone(),
-                    })),
-                }?;
-                Ok(Predicate {
-                    attribute: id,
-                    kind: ast.kind.clone(),
-                })
-            })
     }
 }
 

@@ -1,21 +1,13 @@
 use crate::{
     ast::{self, PredicateKind, *},
+    error::ATreeError,
     events::{
         AttributeDefinition, AttributeIndex, AttributeKind, AttributeTable, Event, EventBuilder,
         EventError,
     },
-    parser::{self, ATreeParseError},
+    parser,
     strings::StringTable,
 };
-use thiserror::Error;
-
-#[derive(Debug, Error)]
-pub enum ATreeError<'a> {
-    #[error("failed to parse the expression with {0:?}")]
-    ParseError(ATreeParseError<'a>),
-    #[error("failed with {0:?}")]
-    Event(EventError),
-}
 
 pub struct ATree {
     nodes: Vec<usize>,
@@ -136,7 +128,7 @@ impl ATree {
     }
 
     pub fn insert<'a, 'tree: 'a>(&'tree mut self, abe: &'a str) -> Result<usize, ATreeError<'a>> {
-        let ast = parser::parse(abe).map_err(ATreeError::ParseError)?;
+        let ast = parser::parse(abe, &mut self.strings).map_err(ATreeError::ParseError)?;
         ATreeNode::from_abe(self, ast)
     }
 

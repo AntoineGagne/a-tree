@@ -1,3 +1,4 @@
+use crate::strings::StringId;
 use rust_decimal::Decimal;
 
 pub type TreeNode = Box<Node>;
@@ -71,12 +72,12 @@ pub enum NullOperator {
 #[derive(Hash, PartialEq, Clone, Debug)]
 pub enum ListLiteral {
     IntegerList(Vec<i64>),
-    StringList(Vec<String>),
+    StringList(Vec<StringId>),
 }
 
 #[derive(Hash, PartialEq, Clone, Debug)]
 pub enum PrimitiveLiteral {
     Integer(i64),
     Float(Decimal),
-    String(String),
+    String(StringId),
 }

@@ -6,7 +6,7 @@ use rust_decimal::Decimal;
 use std::collections::HashMap;
 use thiserror::Error;
 
-#[derive(Error, Debug)]
+#[derive(Error, PartialEq, Debug)]
 pub enum EventError {
     #[error("attribute {0} has already been defined")]
     AlreadyPresent(String),
@@ -72,7 +72,9 @@ impl<'a> EventBuilder<'a> {
 
     pub fn with_string_list(&mut self, name: &str, values: &[&str]) -> Result<(), EventError> {
         self.add_value(name, || {
-            AttributeValue::StringList(values.iter().map(|v| self.strings.get(v)).collect())
+            let mut values: Vec<_> = values.iter().map(|v| self.strings.get(v)).collect();
+            values.sort();
+            AttributeValue::StringList(values)
         })
     }
 
@@ -145,7 +147,7 @@ pub struct AttributeDefinition {
     kind: AttributeKind,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum AttributeKind {
     Boolean,
     Integer,

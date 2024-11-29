@@ -24,7 +24,7 @@ impl StringTable {
         StringId(index)
     }
 
-    fn get_or_update(&mut self, value: &str) -> StringId {
+    pub fn get_or_update(&mut self, value: &str) -> StringId {
         let counter = self.by_values.entry(value.to_string()).or_insert_with(|| {
             let counter = self.counter;
             self.counter += 1;
@@ -35,5 +35,5 @@ impl StringTable {
     }
 }
 
-#[derive(Clone, Copy, Eq, Ord, PartialEq, PartialOrd, Debug)]
+#[derive(Clone, Copy, Eq, Ord, PartialEq, PartialOrd, Debug, Hash)]
 pub struct StringId(usize);

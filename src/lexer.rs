@@ -1,3 +1,4 @@
+use crate::error::ParserError;
 use logos::{Logos, SpannedIter};
 use rust_decimal::Decimal;
 use std::{num::ParseIntError, str::FromStr};
@@ -94,17 +95,17 @@ impl<'input> Lexer<'input> {
 }
 
 impl<'input> Iterator for Lexer<'input> {
-    type Item = Spanned<Token<'input>, usize, LexicalError>;
+    type Item = Spanned<Token<'input>, usize, ParserError>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.token_stream.next().map(|(token, span)| {
-            let token = match token {
+            let token = token.map(|token| match token {
                 // FIXME: This is a bug in Locos where regex take priority over all...
-                Ok(Token::Identifier("not")) => Ok(Token::Not),
+                Token::Identifier("not") => Token::Not,
                 other => other,
-            };
+            });
 
-            Ok((span.start, token?, span.end))
+            Ok((span.start, token.map_err(ParserError::Lexical)?, span.end))
         })
     }
 }
@@ -113,7 +114,7 @@ impl<'input> Iterator for Lexer<'input> {
 mod tests {
     use super::*;
 
-    fn lex_tokens(input: &str) -> Result<Vec<Token>, LexicalError> {
+    fn lex_tokens(input: &str) -> Result<Vec<Token>, ParserError> {
         Lexer::new(input)
             .map(|value| match value {
                 Ok((_, token, _)) => Ok(token),

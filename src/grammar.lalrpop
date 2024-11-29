@@ -1,8 +1,13 @@
-use crate::lexer::{Token, LexicalError};
-use crate::ast;
+use crate::{
+    error::ParserError,
+    lexer::Token,
+    ast,
+    events::{AttributeTable, EventError},
+    strings::StringTable,
+};
 use rust_decimal::Decimal;
 
-grammar<'input>;
+grammar<'input>(strings: &mut StringTable);
 
 pub Tree: ast::Node = {
     Expression
@@ -123,7 +128,7 @@ EqualityExpression: ast::Node = {
 PrimitiveLiteral: ast::PrimitiveLiteral = {
     <value:"integer"> => ast::PrimitiveLiteral::Integer(value),
     <value:"float"> => ast::PrimitiveLiteral::Float(value),
-    <value:"string"> => ast::PrimitiveLiteral::String(value.to_string()),
+    <value:"string"> => ast::PrimitiveLiteral::String(strings.get_or_update(value)),
 }
 
 NullExpression: ast::Node = {
@@ -186,7 +191,7 @@ SetExpression: ast::Node = {
 ListLiteral: ast::ListLiteral = {
     <values:List<"integer">> => ast::ListLiteral::IntegerList(values),
     <values:List<"string">> => ast::ListLiteral::StringList(
-        values.iter().map(|value| value.to_string()).collect()
+        values.iter().map(|value| strings.get_or_update(value)).collect()
     )
 
 }
@@ -207,7 +212,7 @@ Comma<T>: Vec<T> = {
 
 extern {
     type Location = usize;
-    type Error = LexicalError;
+    type Error = ParserError;
 
     enum Token<'input> {
         "(" => Token::LeftParenthesis,

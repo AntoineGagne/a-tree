@@ -9,11 +9,51 @@ use crate::{
     strings::StringTable,
 };
 
+/// The A-Tree data structure as described by the paper.
 pub struct ATree {
     nodes: Vec<usize>,
     strings: StringTable,
     attributes: AttributeTable,
 }
+
+impl ATree {
+    /// Create a new [`ATree`] with the specified attribute definitions.
+    ///
+    /// ```rust
+    /// use a_tree::{ATree, AttributeDefinition};
+    ///
+    /// let definitions = [
+    ///     AttributeDefinition::boolean("private"),
+    ///     AttributeDefinition::integer("exchange_id")
+    /// ];
+    /// let result = ATree::new(&definitions);
+    /// assert!(result.is_ok());
+    /// ```
+    pub fn new(definitions: &[AttributeDefinition]) -> Result<Self, ATreeError> {
+        let attributes = AttributeTable::new(definitions).map_err(ATreeError::Event)?;
+        let strings = StringTable::new();
+        Ok(Self {
+            attributes,
+            strings,
+            nodes: vec![],
+        })
+    }
+
+    pub fn insert<'a, 'tree: 'a>(&'tree mut self, abe: &'a str) -> Result<usize, ATreeError<'a>> {
+        let ast = parser::parse(abe, &mut self.strings).map_err(ATreeError::ParseError)?;
+        ATreeNode::from_abe(self, ast)
+    }
+
+    pub fn make_event(&self) -> EventBuilder {
+        EventBuilder::new(&self.attributes, &self.strings)
+    }
+
+    pub fn search(&self, _event: Event) -> Result<Report, ATreeError> {
+        Ok(Report)
+    }
+}
+
+pub struct Report;
 
 enum ATreeNode {
     LNode {
@@ -115,33 +155,6 @@ pub enum Operator {
     Or,
     Not,
 }
-
-impl ATree {
-    pub fn new(definitions: &[AttributeDefinition]) -> Result<Self, ATreeError> {
-        let attributes = AttributeTable::new(definitions).map_err(ATreeError::Event)?;
-        let strings = StringTable::new();
-        Ok(Self {
-            attributes,
-            strings,
-            nodes: vec![],
-        })
-    }
-
-    pub fn insert<'a, 'tree: 'a>(&'tree mut self, abe: &'a str) -> Result<usize, ATreeError<'a>> {
-        let ast = parser::parse(abe, &mut self.strings).map_err(ATreeError::ParseError)?;
-        ATreeNode::from_abe(self, ast)
-    }
-
-    pub fn make_event(&self) -> EventBuilder {
-        EventBuilder::new(&self.attributes, &self.strings)
-    }
-
-    pub fn search(&self, _event: Event) -> Result<Report, ATreeError> {
-        Ok(Report)
-    }
-}
-
-pub struct Report;
 
 #[cfg(test)]
 mod tests {

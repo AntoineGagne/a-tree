@@ -7,4 +7,8 @@ mod lexer;
 mod parser;
 mod strings;
 
-pub use crate::atree::ATree;
+pub use crate::{
+    atree::ATree,
+    error::ATreeError,
+    events::{AttributeDefinition, Event, EventBuilder, EventError},
+};

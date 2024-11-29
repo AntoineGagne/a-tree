@@ -31,7 +31,7 @@ pub struct EventBuilder<'a> {
 }
 
 impl<'a> EventBuilder<'a> {
-    pub fn new(attributes: &'a AttributeTable, strings: &'a StringTable) -> Self {
+    pub(crate) fn new(attributes: &'a AttributeTable, strings: &'a StringTable) -> Self {
         Self {
             attributes,
             strings,
@@ -91,6 +91,7 @@ impl<'a> EventBuilder<'a> {
     }
 }
 
+/// An event that can be used by the [`crate::atree::ATree`] structure to match ABE.
 pub struct Event(Vec<AttributeValue>);
 
 enum AttributeValue {
@@ -141,6 +142,7 @@ impl AttributeTable {
     }
 }
 
+/// The definition of an attribute that is usable by the [`crate::atree::ATree`].
 #[derive(Clone)]
 pub struct AttributeDefinition {
     name: String,
@@ -158,6 +160,7 @@ pub enum AttributeKind {
 }
 
 impl AttributeDefinition {
+    /// Create a boolean attribute definition.
     pub fn boolean(name: &str) -> Self {
         let kind = AttributeKind::Boolean;
         Self {
@@ -166,6 +169,7 @@ impl AttributeDefinition {
         }
     }
 
+    /// Create an integer attribute definition.
     pub fn integer(name: &str) -> Self {
         let kind = AttributeKind::Integer;
         Self {
@@ -174,6 +178,7 @@ impl AttributeDefinition {
         }
     }
 
+    /// Create a float attribute definition.
     pub fn float(name: &str) -> Self {
         let kind = AttributeKind::Float;
         Self {
@@ -182,6 +187,7 @@ impl AttributeDefinition {
         }
     }
 
+    /// Create a string attribute definition.
     pub fn string(name: &str) -> Self {
         let kind = AttributeKind::String;
         Self {
@@ -190,6 +196,7 @@ impl AttributeDefinition {
         }
     }
 
+    /// Create a list of integers attribute definition.
     pub fn integer_list(name: &str) -> Self {
         let kind = AttributeKind::IntegerList;
         Self {
@@ -198,6 +205,7 @@ impl AttributeDefinition {
         }
     }
 
+    /// Create a list of strings attribute definition.
     pub fn string_list(name: &str) -> Self {
         let kind = AttributeKind::StringList;
         Self {

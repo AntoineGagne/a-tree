@@ -37,18 +37,23 @@ fn validate_predicate(
     match (&kind, attribute_kind) {
         (PredicateKind::Set(_, ListLiteral::StringList(_)), AttributeKind::String) => Ok(()),
         (PredicateKind::Set(_, ListLiteral::IntegerList(_)), AttributeKind::Integer) => Ok(()),
+
         (PredicateKind::Comparison(_, ComparisonValue::Integer(_)), AttributeKind::Integer) => {
             Ok(())
         }
         (PredicateKind::Comparison(_, ComparisonValue::Float(_)), AttributeKind::Float) => Ok(()),
+
         (PredicateKind::Equality(_, PrimitiveLiteral::Integer(_)), AttributeKind::Integer) => {
             Ok(())
         }
         (PredicateKind::Equality(_, PrimitiveLiteral::Float(_)), AttributeKind::Float) => Ok(()),
         (PredicateKind::Equality(_, PrimitiveLiteral::String(_)), AttributeKind::String) => Ok(()),
+
         (PredicateKind::List(_, ListLiteral::IntegerList(_)), AttributeKind::IntegerList) => Ok(()),
         (PredicateKind::List(_, ListLiteral::StringList(_)), AttributeKind::StringList) => Ok(()),
+
         (PredicateKind::Variable, AttributeKind::Boolean) => Ok(()),
+
         (PredicateKind::Null(NullOperator::IsEmpty), AttributeKind::StringList) => Ok(()),
         (PredicateKind::Null(NullOperator::IsEmpty), AttributeKind::IntegerList) => Ok(()),
         (PredicateKind::Null(NullOperator::IsNull), AttributeKind::Integer) => Ok(()),

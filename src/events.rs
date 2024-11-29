@@ -67,7 +67,15 @@ impl<'a> EventBuilder<'a> {
     }
 
     pub fn with_integer_list(&mut self, name: &str, value: &[i64]) -> Result<(), EventError> {
-        self.add_value(name, || AttributeValue::IntegerList(value.to_vec()))
+        self.add_value(name, || {
+            let mut values = value.to_vec();
+            values.sort();
+            AttributeValue::IntegerList(values)
+        })
+    }
+
+    pub fn with_undefined(&mut self, name: &str) -> Result<(), EventError> {
+        self.add_value(name, || AttributeValue::Undefined)
     }
 
     pub fn with_string_list(&mut self, name: &str, values: &[&str]) -> Result<(), EventError> {
@@ -94,13 +102,21 @@ impl<'a> EventBuilder<'a> {
 /// An event that can be used by the [`crate::atree::ATree`] structure to match ABE.
 pub struct Event(Vec<AttributeValue>);
 
-enum AttributeValue {
+impl Event {
+    pub fn get(&self, index: &AttributeIndex) -> &AttributeValue {
+        &self.0[index.0]
+    }
+}
+
+#[derive(Debug)]
+pub enum AttributeValue {
     Boolean(bool),
     Integer(i64),
     Float(Decimal),
     String(StringId),
     IntegerList(Vec<i64>),
     StringList(Vec<StringId>),
+    Undefined,
 }
 
 pub struct AttributeTable {

@@ -1,5 +1,5 @@
 use crate::{
-    events::{AttributeIndex, AttributeKind, AttributeTable, EventError},
+    events::{AttributeIndex, AttributeKind, AttributeTable, AttributeValue, Event, EventError},
     strings::StringId,
 };
 use rust_decimal::Decimal;
@@ -26,6 +26,21 @@ impl Predicate {
                     kind,
                 })
             })
+    }
+
+    pub fn evaluate(&self, event: Event) -> bool {
+        let value = event.get(&self.attribute);
+        match (&self.kind, value) {
+            (PredicateKind::Variable, AttributeValue::Boolean(value)) => *value,
+            (PredicateKind::Null(operator), value) => operator.evaluate(value),
+            (PredicateKind::Set(operator, haystack), needle) => operator.evaluate(haystack, needle),
+            (PredicateKind::Comparison(operator, a), b) => operator.evaluate(a, b),
+            (PredicateKind::Equality(operator, a), b) => operator.evaluate(a, b),
+            (PredicateKind::List(operator, a), b) => operator.evaluate(a, b),
+            (kind, value) => {
+                unreachable!("Invalid => got: {kind:?} with {value:?}");
+            }
+        }
     }
 }
 
@@ -86,12 +101,53 @@ pub enum SetOperator {
     In,
 }
 
+impl SetOperator {
+    fn evaluate(&self, haystack: &ListLiteral, needle: &AttributeValue) -> bool {
+        match (haystack, needle) {
+            (ListLiteral::StringList(haystack), AttributeValue::String(needle)) => {
+                self.apply(haystack, needle)
+            }
+            (ListLiteral::IntegerList(haystack), AttributeValue::Integer(needle)) => {
+                self.apply(haystack, needle)
+            }
+            (a, b) => {
+                unreachable!("Set operation ({self:?}) in haystack {a:?} for {b:?} should never happen. This is a bug.")
+            }
+        }
+    }
+
+    fn apply<T: PartialOrd>(&self, haystack: &[T], needle: &T) -> bool {
+        unimplemented!();
+    }
+}
+
 #[derive(Hash, PartialEq, Clone, Debug)]
 pub enum ComparisonOperator {
     LessThan,
     LessThanEqual,
     GreaterThanEqual,
     GreaterThan,
+}
+
+impl ComparisonOperator {
+    fn evaluate(&self, a: &ComparisonValue, b: &AttributeValue) -> bool {
+        match (a, b) {
+            (ComparisonValue::Float(b), AttributeValue::Float(a)) => self.apply(&a, &b),
+            (ComparisonValue::Integer(b), AttributeValue::Integer(a)) => self.apply(&a, &b),
+            (a, b) => {
+                unreachable!("Comparison ({self:?}) between {a:?} and {b:?} should never happen. This is a bug.")
+            }
+        }
+    }
+
+    fn apply<T: PartialOrd>(&self, a: &T, b: &T) -> bool {
+        match self {
+            Self::LessThan => *a < *b,
+            Self::LessThanEqual => *a <= *b,
+            Self::GreaterThan => *a > *b,
+            Self::GreaterThanEqual => *a >= *b,
+        }
+    }
 }
 
 #[derive(Hash, PartialEq, Clone, Debug)]
@@ -106,6 +162,26 @@ pub enum EqualityOperator {
     NotEqual,
 }
 
+impl EqualityOperator {
+    fn evaluate(&self, a: &PrimitiveLiteral, b: &AttributeValue) -> bool {
+        match (a, b) {
+            (PrimitiveLiteral::Float(a), AttributeValue::Float(b)) => self.apply(&a, &b),
+            (PrimitiveLiteral::Integer(a), AttributeValue::Integer(b)) => self.apply(&a, &b),
+            (PrimitiveLiteral::String(a), AttributeValue::String(b)) => self.apply(&a, &b),
+            (a, b) => {
+                unreachable!("Equality ({self:?}) between {a:?} and {b:?} should never happen. This is a bug.")
+            }
+        }
+    }
+
+    fn apply<T: PartialEq>(&self, a: &T, b: &T) -> bool {
+        match self {
+            Self::Equal => *a == *b,
+            Self::NotEqual => *a != *b,
+        }
+    }
+}
+
 #[derive(Hash, PartialEq, Clone, Debug)]
 #[allow(clippy::enum_variant_names)]
 pub enum ListOperator {
@@ -114,12 +190,42 @@ pub enum ListOperator {
     AllOf,
 }
 
+impl ListOperator {
+    fn evaluate(&self, a: &ListLiteral, b: &AttributeValue) -> bool {
+        unimplemented!();
+    }
+}
+
 #[derive(Hash, PartialEq, Clone, Debug)]
 #[allow(clippy::enum_variant_names)]
 pub enum NullOperator {
     IsNull,
     IsNotNull,
     IsEmpty,
+}
+
+impl NullOperator {
+    fn evaluate(&self, value: &AttributeValue) -> bool {
+        match (self, value) {
+            (Self::IsNull, AttributeValue::Undefined) => true,
+            (
+                Self::IsNull,
+                AttributeValue::Integer(_) | AttributeValue::String(_) | AttributeValue::Float(_),
+            ) => false,
+            (Self::IsNotNull, AttributeValue::Undefined) => false,
+            (
+                Self::IsNotNull,
+                AttributeValue::Integer(_) | AttributeValue::String(_) | AttributeValue::Float(_),
+            ) => true,
+            (Self::IsEmpty, AttributeValue::StringList(list)) => list.is_empty(),
+            (Self::IsEmpty, AttributeValue::IntegerList(list)) => list.is_empty(),
+            (_, value) => {
+                unreachable!(
+                    "Null check ({self:?}) for {value:?} should never happen. This is a bug."
+                )
+            }
+        }
+    }
 }
 
 #[derive(Hash, PartialEq, Clone, Debug)]

@@ -1,27 +1,20 @@
-use crate::ast::{self, PredicateKind, *};
-use crate::parser::{self, ATreeParseError};
-use rust_decimal::Decimal;
-use std::{collections::HashMap, ptr::NonNull};
+use crate::{
+    ast::{self, PredicateKind, *},
+    events::{
+        AttributeDefinition, AttributeIndex, AttributeKind, AttributeTable, Event, EventBuilder,
+        EventError,
+    },
+    parser::{self, ATreeParseError},
+    strings::StringTable,
+};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum ATreeError<'a> {
-    #[error("attribute {0} has already been defined")]
-    AlreadyPresent(String),
-    #[error("attribute {0} does not exist")]
-    NonExisting(String),
-    #[error("event is missing some attributes")]
-    MissingAttributes,
-    #[error("ABE refers to non-existing attribute '{0:?}'")]
-    NonExistingAttribute(String),
-    #[error("{name:?}: mismatching types => expected: {expected:?}, found: {actual:?}")]
-    MismatchingTypes {
-        name: String,
-        expected: AttributeKind,
-        actual: PredicateKind,
-    },
     #[error("failed to parse the expression with {0:?}")]
     ParseError(ATreeParseError<'a>),
+    #[error("failed with {0:?}")]
+    Event(EventError),
 }
 
 pub struct ATree {
@@ -70,7 +63,9 @@ impl Predicate {
     ) -> Result<Self, ATreeError<'a>> {
         attributes
             .by_name(&ast.attribute)
-            .ok_or_else(|| ATreeError::NonExistingAttribute(ast.attribute.clone()))
+            .ok_or_else(|| {
+                ATreeError::Event(EventError::NonExistingAttribute(ast.attribute.clone()))
+            })
             .and_then(|id| {
                 let id = match (&ast.kind, attributes.by_id(id)) {
                     (PredicateKind::Set(_, ListLiteral::StringList(_)), AttributeKind::String) => {
@@ -109,11 +104,11 @@ impl Predicate {
                         AttributeKind::StringList,
                     ) => Ok(id),
                     (PredicateKind::Variable, AttributeKind::Boolean) => Ok(id),
-                    (actual, expected) => Err(ATreeError::MismatchingTypes {
+                    (actual, expected) => Err(ATreeError::Event(EventError::MismatchingTypes {
                         name: ast.attribute.clone(),
                         expected,
                         actual: actual.clone(),
-                    }),
+                    })),
                 }?;
                 Ok(Predicate {
                     attribute: id,
@@ -131,7 +126,7 @@ pub enum Operator {
 
 impl ATree {
     pub fn new(definitions: &[AttributeDefinition]) -> Result<Self, ATreeError> {
-        let attributes = AttributeTable::new(definitions)?;
+        let attributes = AttributeTable::new(definitions).map_err(ATreeError::Event)?;
         let strings = StringTable::new();
         Ok(Self {
             attributes,
@@ -156,228 +151,10 @@ impl ATree {
 
 pub struct Report;
 
-pub struct EventBuilder<'a> {
-    by_ids: Vec<(AttributeIndex, AttributeValue)>,
-    attributes: &'a AttributeTable,
-    strings: &'a StringTable,
-}
-
-impl<'a> EventBuilder<'a> {
-    pub fn new(attributes: &'a AttributeTable, strings: &'a StringTable) -> Self {
-        Self {
-            attributes,
-            strings,
-            by_ids: Vec::with_capacity(attributes.len()),
-        }
-    }
-
-    pub fn build(mut self) -> Result<Event, ATreeError<'a>> {
-        if self.by_ids.len() != self.attributes.len() {
-            return Err(ATreeError::MissingAttributes);
-        }
-        self.by_ids.sort_by(|(k1, _), (k2, _)| k1.cmp(k2));
-        Ok(Event(self.by_ids.into_iter().map(|(_, v)| v).collect()))
-    }
-
-    pub fn with_boolean(&mut self, name: &str, value: bool) -> Result<(), ATreeError> {
-        self.add_value(name, || AttributeValue::Boolean(value))
-    }
-
-    pub fn with_integer(&mut self, name: &str, value: i64) -> Result<(), ATreeError> {
-        self.add_value(name, || AttributeValue::Integer(value))
-    }
-
-    pub fn with_float(&mut self, name: &str, value: Decimal) -> Result<(), ATreeError> {
-        self.add_value(name, || AttributeValue::Float(value))
-    }
-
-    pub fn with_string(&mut self, name: &str, value: &str) -> Result<(), ATreeError> {
-        self.add_value(name, || {
-            let string_index = self.strings.get(value);
-            AttributeValue::String(string_index)
-        })
-    }
-
-    pub fn with_integer_list(&mut self, name: &str, value: &[i64]) -> Result<(), ATreeError> {
-        self.add_value(name, || AttributeValue::IntegerList(value.to_vec()))
-    }
-
-    pub fn with_string_list(&mut self, name: &str, values: &[&str]) -> Result<(), ATreeError> {
-        self.add_value(name, || {
-            AttributeValue::StringList(values.iter().map(|v| self.strings.get(v)).collect())
-        })
-    }
-
-    fn add_value<F>(&mut self, name: &str, f: F) -> Result<(), ATreeError>
-    where
-        F: FnOnce() -> AttributeValue,
-    {
-        if let Some(index) = self.attributes.by_name(name) {
-            self.by_ids.push((index, f()));
-            Ok(())
-        } else {
-            Err(ATreeError::NonExisting(name.to_string()))
-        }
-    }
-}
-
-pub struct Event(Vec<AttributeValue>);
-
-enum AttributeValue {
-    Boolean(bool),
-    Integer(i64),
-    Float(Decimal),
-    String(StringId),
-    IntegerList(Vec<i64>),
-    StringList(Vec<StringId>),
-}
-
-struct StringTable {
-    by_values: HashMap<String, usize>,
-    counter: usize,
-}
-
-impl StringTable {
-    const SENTINEL_ID: usize = 0;
-
-    fn new() -> Self {
-        Self {
-            by_values: HashMap::new(),
-            counter: 1,
-        }
-    }
-
-    fn get(&self, value: &str) -> StringId {
-        let index = self
-            .by_values
-            .get(value)
-            .cloned()
-            .unwrap_or(Self::SENTINEL_ID);
-        StringId(index)
-    }
-
-    fn get_or_update(&mut self, value: &str) -> StringId {
-        let counter = self.by_values.entry(value.to_string()).or_insert_with(|| {
-            let counter = self.counter;
-            self.counter += 1;
-            counter
-        });
-
-        StringId(*counter)
-    }
-}
-
-#[derive(Clone, Copy, Eq, Ord, PartialEq, PartialOrd, Debug)]
-struct StringId(usize);
-
-struct AttributeTable {
-    by_names: HashMap<String, AttributeIndex>,
-    by_ids: Vec<AttributeKind>,
-}
-
-#[derive(Clone, Copy, Eq, Ord, PartialEq, PartialOrd, Debug)]
-struct AttributeIndex(usize);
-
-impl AttributeTable {
-    fn new(definitions: &[AttributeDefinition]) -> Result<Self, ATreeError> {
-        let size = definitions.len();
-        let mut by_names = HashMap::with_capacity(size);
-        let mut by_ids = Vec::with_capacity(size);
-        for (i, definition) in definitions.iter().enumerate() {
-            let name = definition.name.to_owned();
-            if by_names.contains_key(&name) {
-                return Err(ATreeError::AlreadyPresent(name));
-            }
-
-            by_names.insert(name, AttributeIndex(i));
-            by_ids.push(definition.kind.clone());
-        }
-
-        Ok(Self { by_names, by_ids })
-    }
-
-    fn by_name(&self, name: &str) -> Option<AttributeIndex> {
-        self.by_names.get(name).cloned()
-    }
-
-    fn by_id(&self, id: AttributeIndex) -> AttributeKind {
-        self.by_ids[id.0].clone()
-    }
-
-    fn len(&self) -> usize {
-        self.by_ids.len()
-    }
-}
-
-#[derive(Clone)]
-pub struct AttributeDefinition {
-    name: String,
-    kind: AttributeKind,
-}
-
-#[derive(Clone, Debug)]
-enum AttributeKind {
-    Boolean,
-    Integer,
-    Float,
-    String,
-    IntegerList,
-    StringList,
-}
-
-impl AttributeDefinition {
-    pub fn boolean(name: &str) -> Self {
-        let kind = AttributeKind::Boolean;
-        Self {
-            name: name.to_owned(),
-            kind,
-        }
-    }
-
-    pub fn integer(name: &str) -> Self {
-        let kind = AttributeKind::Integer;
-        Self {
-            name: name.to_owned(),
-            kind,
-        }
-    }
-
-    pub fn float(name: &str) -> Self {
-        let kind = AttributeKind::Float;
-        Self {
-            name: name.to_owned(),
-            kind,
-        }
-    }
-
-    pub fn string(name: &str) -> Self {
-        let kind = AttributeKind::String;
-        Self {
-            name: name.to_owned(),
-            kind,
-        }
-    }
-
-    pub fn integer_list(name: &str) -> Self {
-        let kind = AttributeKind::IntegerList;
-        Self {
-            name: name.to_owned(),
-            kind,
-        }
-    }
-
-    pub fn string_list(name: &str) -> Self {
-        let kind = AttributeKind::StringList;
-        Self {
-            name: name.to_owned(),
-            kind,
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rust_decimal::Decimal;
 
     #[test]
     fn can_build_an_atree() {
@@ -486,7 +263,7 @@ mod tests {
 
         let result = event_builder.with_boolean("non_existing", true);
 
-        assert!(matches!(result, Err(ATreeError::NonExisting(_))));
+        assert!(matches!(result, Err(EventError::NonExisting(_))));
     }
 
     #[test]
@@ -532,7 +309,7 @@ mod tests {
 
         assert!(matches!(
             event_builder.build(),
-            Err(ATreeError::MissingAttributes)
+            Err(EventError::MissingAttributes)
         ));
     }
 }

@@ -16,6 +16,12 @@ pub enum EventError {
     MissingAttributes,
     #[error("ABE refers to non-existing attribute '{0:?}'")]
     NonExistingAttribute(String),
+    #[error("{name:?}: wrong types => expected: {expected:?}, found: {actual:?}")]
+    WrongType {
+        name: String,
+        expected: AttributeKind,
+        actual: AttributeKind,
+    },
     #[error("{name:?}: mismatching types => expected: {expected:?}, found: {actual:?}")]
     MismatchingTypes {
         name: String,
@@ -25,7 +31,7 @@ pub enum EventError {
 }
 
 pub struct EventBuilder<'a> {
-    by_ids: Vec<(AttributeIndex, AttributeValue)>,
+    by_ids: Vec<AttributeValue>,
     attributes: &'a AttributeTable,
     strings: &'a StringTable,
 }
@@ -35,39 +41,39 @@ impl<'a> EventBuilder<'a> {
         Self {
             attributes,
             strings,
-            by_ids: Vec::with_capacity(attributes.len()),
+            by_ids: vec![AttributeValue::Undefined; attributes.len()],
         }
     }
 
-    pub fn build(mut self) -> Result<Event, EventError> {
-        if self.by_ids.len() != self.attributes.len() {
-            return Err(EventError::MissingAttributes);
-        }
-        self.by_ids.sort_by(|(k1, _), (k2, _)| k1.cmp(k2));
-        Ok(Event(self.by_ids.into_iter().map(|(_, v)| v).collect()))
+    pub fn build(self) -> Result<Event, EventError> {
+        Ok(Event(self.by_ids))
     }
 
     pub fn with_boolean(&mut self, name: &str, value: bool) -> Result<(), EventError> {
-        self.add_value(name, || AttributeValue::Boolean(value))
+        self.add_value(name, AttributeKind::Boolean, || {
+            AttributeValue::Boolean(value)
+        })
     }
 
     pub fn with_integer(&mut self, name: &str, value: i64) -> Result<(), EventError> {
-        self.add_value(name, || AttributeValue::Integer(value))
+        self.add_value(name, AttributeKind::Integer, || {
+            AttributeValue::Integer(value)
+        })
     }
 
     pub fn with_float(&mut self, name: &str, value: Decimal) -> Result<(), EventError> {
-        self.add_value(name, || AttributeValue::Float(value))
+        self.add_value(name, AttributeKind::Float, || AttributeValue::Float(value))
     }
 
     pub fn with_string(&mut self, name: &str, value: &str) -> Result<(), EventError> {
-        self.add_value(name, || {
+        self.add_value(name, AttributeKind::String, || {
             let string_index = self.strings.get(value);
             AttributeValue::String(string_index)
         })
     }
 
     pub fn with_integer_list(&mut self, name: &str, value: &[i64]) -> Result<(), EventError> {
-        self.add_value(name, || {
+        self.add_value(name, AttributeKind::IntegerList, || {
             let mut values = value.to_vec();
             values.sort();
             AttributeValue::IntegerList(values)
@@ -75,27 +81,40 @@ impl<'a> EventBuilder<'a> {
     }
 
     pub fn with_undefined(&mut self, name: &str) -> Result<(), EventError> {
-        self.add_value(name, || AttributeValue::Undefined)
+        let index = self
+            .attributes
+            .by_name(name)
+            .ok_or_else(|| EventError::NonExisting(name.to_string()))?;
+        self.by_ids[index.0] = AttributeValue::Undefined;
+        Ok(())
     }
 
     pub fn with_string_list(&mut self, name: &str, values: &[&str]) -> Result<(), EventError> {
-        self.add_value(name, || {
+        self.add_value(name, AttributeKind::StringList, || {
             let mut values: Vec<_> = values.iter().map(|v| self.strings.get(v)).collect();
             values.sort();
             AttributeValue::StringList(values)
         })
     }
 
-    fn add_value<F>(&mut self, name: &str, f: F) -> Result<(), EventError>
+    fn add_value<F>(&mut self, name: &str, actual: AttributeKind, f: F) -> Result<(), EventError>
     where
         F: FnOnce() -> AttributeValue,
     {
-        if let Some(index) = self.attributes.by_name(name) {
-            self.by_ids.push((index, f()));
-            Ok(())
-        } else {
-            Err(EventError::NonExisting(name.to_string()))
+        let index = self
+            .attributes
+            .by_name(name)
+            .ok_or_else(|| EventError::NonExisting(name.to_string()))?;
+        let expected = self.attributes.by_id(index);
+        if expected != actual {
+            return Err(EventError::WrongType {
+                name: name.to_owned(),
+                expected,
+                actual,
+            });
         }
+        self.by_ids[index.0] = f();
+        Ok(())
     }
 }
 
@@ -108,7 +127,7 @@ impl Event {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum AttributeValue {
     Boolean(bool),
     Integer(i64),
@@ -228,5 +247,180 @@ impl AttributeDefinition {
             name: name.to_owned(),
             kind,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn can_create_an_attribute_table_with_no_attributes() {
+        assert!(AttributeTable::new(&[]).is_ok())
+    }
+
+    #[test]
+    fn can_create_an_attribute_table_with_some_attributes() {
+        let definitions = [
+            AttributeDefinition::boolean("private"),
+            AttributeDefinition::string_list("deals"),
+            AttributeDefinition::integer("exchange_id"),
+            AttributeDefinition::float("bidfloor"),
+            AttributeDefinition::string("country"),
+            AttributeDefinition::integer_list("segment_ids"),
+        ];
+
+        assert!(AttributeTable::new(&definitions).is_ok());
+    }
+
+    #[test]
+    fn return_an_error_on_duplicate_definitions() {
+        let definitions = [
+            AttributeDefinition::boolean("private"),
+            AttributeDefinition::string("country"),
+            AttributeDefinition::string_list("deals"),
+            AttributeDefinition::integer("exchange_id"),
+            AttributeDefinition::float("bidfloor"),
+            AttributeDefinition::integer("country"),
+            AttributeDefinition::integer_list("segment_ids"),
+        ];
+
+        assert!(AttributeTable::new(&definitions).is_err());
+    }
+
+    #[test]
+    fn can_add_a_boolean_attribute_value() {
+        let attributes = AttributeTable::new(&[AttributeDefinition::boolean("private")]).unwrap();
+        let strings = StringTable::new();
+        let mut event_builder = EventBuilder::new(&attributes, &strings);
+
+        let result = event_builder.with_boolean("private", true);
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn can_add_an_integer_attribute_value() {
+        let attributes =
+            AttributeTable::new(&[AttributeDefinition::integer("exchange_id")]).unwrap();
+        let strings = StringTable::new();
+        let mut event_builder = EventBuilder::new(&attributes, &strings);
+
+        let result = event_builder.with_integer("exchange_id", 1);
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn can_add_a_float_attribute_value() {
+        let attributes = AttributeTable::new(&[AttributeDefinition::float("bidfloor")]).unwrap();
+        let strings = StringTable::new();
+        let mut event_builder = EventBuilder::new(&attributes, &strings);
+
+        let result = event_builder.with_float("bidfloor", Decimal::new(1, 0));
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn can_add_a_string_attribute_value() {
+        let attributes = AttributeTable::new(&[AttributeDefinition::string("country")]).unwrap();
+        let strings = StringTable::new();
+        let mut event_builder = EventBuilder::new(&attributes, &strings);
+
+        let result = event_builder.with_string("country", "US");
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn can_add_an_integer_list_attribute_value() {
+        let attributes =
+            AttributeTable::new(&[AttributeDefinition::integer_list("segment_ids")]).unwrap();
+        let strings = StringTable::new();
+        let mut event_builder = EventBuilder::new(&attributes, &strings);
+
+        let result = event_builder.with_integer_list("segment_ids", &[1, 2, 3]);
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn can_add_an_string_list_attribute_value() {
+        let attributes =
+            AttributeTable::new(&[AttributeDefinition::string_list("deal_ids")]).unwrap();
+        let strings = StringTable::new();
+        let mut event_builder = EventBuilder::new(&attributes, &strings);
+
+        let result = event_builder.with_string_list("deal_ids", &["deal-1", "deal-2"]);
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn return_an_error_when_adding_a_non_existing_attribute() {
+        let attributes =
+            AttributeTable::new(&[AttributeDefinition::string_list("deal_ids")]).unwrap();
+        let strings = StringTable::new();
+        let mut event_builder = EventBuilder::new(&attributes, &strings);
+
+        let result = event_builder.with_boolean("non_existing", true);
+
+        assert!(matches!(result, Err(EventError::NonExisting(_))));
+    }
+
+    #[test]
+    fn can_create_an_event_with_no_attributes() {
+        let attributes = AttributeTable::new(&[]).unwrap();
+        let strings = StringTable::new();
+        let event_builder = EventBuilder::new(&attributes, &strings);
+
+        assert!(event_builder.build().is_ok());
+    }
+
+    #[test]
+    fn can_create_an_event_with_attributes() {
+        let attributes = AttributeTable::new(&[
+            AttributeDefinition::boolean("private"),
+            AttributeDefinition::string_list("deals"),
+            AttributeDefinition::integer("exchange_id"),
+            AttributeDefinition::float("bidfloor"),
+            AttributeDefinition::string("country"),
+            AttributeDefinition::integer_list("segment_ids"),
+        ])
+        .unwrap();
+        let strings = StringTable::new();
+        let mut builder = EventBuilder::new(&attributes, &strings);
+
+        assert!(builder.with_boolean("private", true).is_ok());
+        assert!(builder
+            .with_string_list("deals", &["deal-1", "deal-2"])
+            .is_ok());
+        assert!(builder.with_integer("exchange_id", 1).is_ok());
+        assert!(builder.with_float("bidfloor", Decimal::new(1, 0)).is_ok());
+        assert!(builder.with_string("country", "US").is_ok());
+        assert!(builder.with_integer_list("segment_ids", &[1, 2, 3]).is_ok());
+
+        assert!(builder.build().is_ok());
+    }
+
+    #[test]
+    fn can_create_an_event_with_a_missing_attribute() {
+        let attributes = AttributeTable::new(&[AttributeDefinition::boolean("private")]).unwrap();
+        let strings = StringTable::new();
+        let event_builder = EventBuilder::new(&attributes, &strings);
+
+        assert!(event_builder.build().is_ok());
+    }
+
+    #[test]
+    fn return_an_error_when_trying_to_add_an_attribute_with_mismatched_type() {
+        let attributes = AttributeTable::new(&[AttributeDefinition::boolean("private")]).unwrap();
+        let strings = StringTable::new();
+        let mut event_builder = EventBuilder::new(&attributes, &strings);
+
+        let result = event_builder.with_integer("private", 1);
+
+        assert!(result.is_err());
     }
 }

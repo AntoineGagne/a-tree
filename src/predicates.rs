@@ -11,7 +11,7 @@ pub struct Predicate {
 }
 
 impl Predicate {
-    pub fn new<'a>(
+    pub fn new(
         attributes: &AttributeTable,
         name: &str,
         kind: PredicateKind,

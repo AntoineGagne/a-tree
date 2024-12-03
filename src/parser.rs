@@ -439,6 +439,29 @@ mod tests {
     }
 
     #[test]
+    fn can_parse_one_of_list_expression_with_integer_list_in_square_brackets() {
+        let mut strings = StringTable::new();
+        let attributes = define_attributes();
+
+        let parsed = parse("ids one of [1, 2, 3]", &attributes, &mut strings);
+
+        assert_eq!(
+            Ok(Node::Value(
+                Predicate::new(
+                    &attributes,
+                    "ids",
+                    PredicateKind::List(
+                        ListOperator::OneOf,
+                        ListLiteral::IntegerList(vec![1, 2, 3])
+                    )
+                )
+                .unwrap()
+            )),
+            parsed
+        );
+    }
+
+    #[test]
     fn can_parse_one_of_list_expression_with_single_element_string_list() {
         let mut strings = StringTable::new();
         let attributes = define_attributes();

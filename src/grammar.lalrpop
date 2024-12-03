@@ -226,6 +226,9 @@ List<T>: Vec<T> = {
     "(" <values:Comma<T>> ")" => {
         values.into_iter().sorted().unique().collect()
     },
+    "[" <values:Comma<T>> "]" => {
+        values.into_iter().sorted().unique().collect()
+    },
 }
 
 Comma<T>: Vec<T> = {
@@ -245,6 +248,8 @@ extern {
     enum Token<'input> {
         "(" => Token::LeftParenthesis,
         ")" => Token::RightParenthesis,
+        "[" => Token::LeftSquareBracket,
+        "]" => Token::RightSquareBracket,
         "," => Token::Comma,
         "<" => Token::LessThan,
         "<=" => Token::LessThanEqual,

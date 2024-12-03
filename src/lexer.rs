@@ -59,6 +59,10 @@ pub enum Token<'source> {
     LeftParenthesis,
     #[token(")")]
     RightParenthesis,
+    #[token("[")]
+    LeftSquareBracket,
+    #[token("]")]
+    RightSquareBracket,
     #[token(",")]
     Comma,
     #[regex(r"-?[0-9]+", |lex| lex.slice().parse::<i64>().map_err(LexicalError::Integer))]
@@ -237,6 +241,14 @@ mod tests {
         let other = lex_tokens(")").unwrap();
         assert_eq!(vec![Token::LeftParenthesis], actual);
         assert_eq!(vec![Token::RightParenthesis], other);
+    }
+
+    #[test]
+    fn can_lex_square_brackets() {
+        let actual = lex_tokens("[").unwrap();
+        let other = lex_tokens("]").unwrap();
+        assert_eq!(vec![Token::LeftSquareBracket], actual);
+        assert_eq!(vec![Token::RightSquareBracket], other);
     }
 
     #[test]

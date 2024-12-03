@@ -515,6 +515,33 @@ mod tests {
     }
 
     #[test]
+    fn sort_lists_when_parsing_an_expression_that_contains_a_list() {
+        let mut strings = StringTable::new();
+        let attributes = define_attributes();
+
+        let parsed = parse(
+            "ids all of (12, 8, 10, 11, 9, 4, 3, 4, 5, 1, 0, 6, 7, 3, 4, 1, 2, 3)",
+            &attributes,
+            &mut strings,
+        );
+
+        assert_eq!(
+            Ok(Node::Value(
+                Predicate::new(
+                    &attributes,
+                    "ids",
+                    PredicateKind::List(
+                        ListOperator::AllOf,
+                        ListLiteral::IntegerList(vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])
+                    )
+                )
+                .unwrap()
+            )),
+            parsed
+        );
+    }
+
+    #[test]
     fn can_parse_all_of_list_expression_with_string_list() {
         let mut strings = StringTable::new();
         let attributes = define_attributes();
@@ -1062,7 +1089,7 @@ mod tests {
     }
 
     #[test]
-    fn can_an_expression_with_mixed_binary_operator() {
+    fn can_parse_an_expression_with_mixed_binary_operator() {
         let mut strings = StringTable::new();
         let attributes = define_attributes();
 
@@ -1183,7 +1210,7 @@ mod tests {
                             "country",
                             PredicateKind::Set(
                                 SetOperator::In,
-                                ListLiteral::StringList(vec![strings.get("US"), strings.get("CA")])
+                                ListLiteral::StringList(vec![strings.get("CA"), strings.get("US")])
                             )
                         )
                         .unwrap()

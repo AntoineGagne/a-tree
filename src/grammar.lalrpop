@@ -6,6 +6,7 @@ use crate::{
     events::{AttributeTable, EventError},
     strings::StringTable,
 };
+use itertools::Itertools;
 use rust_decimal::Decimal;
 use lalrpop_util::ParseError;
 
@@ -222,7 +223,9 @@ ListLiteral: predicates::ListLiteral = {
 }
 
 List<T>: Vec<T> = {
-    "(" <values:Comma<T>> ")" => values,
+    "(" <values:Comma<T>> ")" => {
+        values.into_iter().sorted().unique().collect()
+    },
 }
 
 Comma<T>: Vec<T> = {

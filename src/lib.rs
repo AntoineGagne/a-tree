@@ -9,7 +9,7 @@ mod predicates;
 mod strings;
 
 pub use crate::{
-    atree::ATree,
+    atree::{ATree, Report},
     error::ATreeError,
     events::{AttributeDefinition, Event, EventBuilder, EventError},
 };

@@ -390,7 +390,7 @@ mod tests {
         let mut strings = StringTable::new();
         let attributes = define_attributes();
 
-        let parsed = parse("deals one of ()", &attributes, &mut strings);
+        let parsed = parse("deals one of []", &attributes, &mut strings);
 
         assert!(parsed.is_err());
     }
@@ -400,7 +400,7 @@ mod tests {
         let mut strings = StringTable::new();
         let attributes = define_attributes();
 
-        let parsed = parse("ids one of (1)", &attributes, &mut strings);
+        let parsed = parse("ids one of [1]", &attributes, &mut strings);
 
         assert_eq!(
             Ok(Node::Value(
@@ -420,7 +420,7 @@ mod tests {
         let mut strings = StringTable::new();
         let attributes = define_attributes();
 
-        let parsed = parse("ids one of (1, 2, 3)", &attributes, &mut strings);
+        let parsed = parse("ids one of [1, 2, 3]", &attributes, &mut strings);
 
         assert_eq!(
             Ok(Node::Value(
@@ -466,7 +466,7 @@ mod tests {
         let mut strings = StringTable::new();
         let attributes = define_attributes();
 
-        let parsed = parse(r##"deals one of ("deal-1")"##, &attributes, &mut strings);
+        let parsed = parse(r##"deals one of ["deal-1"]"##, &attributes, &mut strings);
 
         assert_eq!(
             Ok(Node::Value(
@@ -490,7 +490,7 @@ mod tests {
         let attributes = define_attributes();
 
         let parsed = parse(
-            r##"deals one of ("deal-1", "deal-2", "deal-3")"##,
+            r##"deals one of ["deal-1", "deal-2", "deal-3"]"##,
             &attributes,
             &mut strings,
         );
@@ -520,7 +520,7 @@ mod tests {
         let mut strings = StringTable::new();
         let attributes = define_attributes();
 
-        let parsed = parse("ids all of (1, 2, 3)", &attributes, &mut strings);
+        let parsed = parse("ids all of [1, 2, 3]", &attributes, &mut strings);
 
         assert_eq!(
             Ok(Node::Value(
@@ -544,7 +544,7 @@ mod tests {
         let attributes = define_attributes();
 
         let parsed = parse(
-            "ids all of (12, 8, 10, 11, 9, 4, 3, 4, 5, 1, 0, 6, 7, 3, 4, 1, 2, 3)",
+            "ids all of [12, 8, 10, 11, 9, 4, 3, 4, 5, 1, 0, 6, 7, 3, 4, 1, 2, 3]",
             &attributes,
             &mut strings,
         );
@@ -571,7 +571,7 @@ mod tests {
         let attributes = define_attributes();
 
         let parsed = parse(
-            r##"deals all of ("deal-1", "deal-2", "deal-3")"##,
+            r##"deals all of ["deal-1", "deal-2", "deal-3"]"##,
             &attributes,
             &mut strings,
         );
@@ -601,7 +601,7 @@ mod tests {
         let mut strings = StringTable::new();
         let attributes = define_attributes();
 
-        let parsed = parse("ids none of (1, 2, 3)", &attributes, &mut strings);
+        let parsed = parse("ids none of [1, 2, 3]", &attributes, &mut strings);
 
         assert_eq!(
             Ok(Node::Value(
@@ -625,7 +625,7 @@ mod tests {
         let attributes = define_attributes();
 
         let parsed = parse(
-            r##"deals none of ("deal-1", "deal-2", "deal-3")"##,
+            r##"deals none of ["deal-1", "deal-2", "deal-3"]"##,
             &attributes,
             &mut strings,
         );
@@ -656,7 +656,7 @@ mod tests {
         let attributes = define_attributes();
 
         let parsed = parse(
-            r##"(deals none of ("deal-1", "deal-2", "deal-3"))"##,
+            r##"(deals none of ["deal-1", "deal-2", "deal-3"])"##,
             &attributes,
             &mut strings,
         );
@@ -697,7 +697,7 @@ mod tests {
         let attributes = define_attributes();
 
         let parsed = parse(
-            r##"deal in ("deal-1", "deal-2", "deal-3")"##,
+            r##"deal in ["deal-1", "deal-2", "deal-3"]"##,
             &attributes,
             &mut strings,
         );
@@ -728,7 +728,7 @@ mod tests {
         let attributes = define_attributes();
 
         let parsed = parse(
-            r##"exchange_id not in (1, 2, 3)"##,
+            r##"exchange_id not in [1, 2, 3]"##,
             &attributes,
             &mut strings,
         );
@@ -751,7 +751,7 @@ mod tests {
         let mut strings = StringTable::new();
         let attributes = define_attributes();
 
-        let parsed = parse(r##"exchange_id not in ()"##, &attributes, &mut strings);
+        let parsed = parse(r##"exchange_id not in []"##, &attributes, &mut strings);
 
         assert!(parsed.is_err());
     }
@@ -762,7 +762,7 @@ mod tests {
         let attributes = define_attributes();
 
         let parsed = parse(
-            r##"deal_ids none of ("deal-2", "deal-4") and deal_ids one of ("deal-1", "deal-3")"##,
+            r##"deal_ids none of ["deal-2", "deal-4"] and deal_ids one of ["deal-1", "deal-3"]"##,
             &attributes,
             &mut strings,
         );
@@ -808,7 +808,7 @@ mod tests {
         let attributes = define_attributes();
 
         let parsed = parse(
-            r##"exchange_id = 1 and private and deal_ids none of ("deal-2", "deal-4")"##,
+            r##"exchange_id = 1 and private and deal_ids none of ["deal-2", "deal-4"]"##,
             &attributes,
             &mut strings,
         );
@@ -856,7 +856,7 @@ mod tests {
         let attributes = define_attributes();
 
         let parsed = parse(
-            r##"exchange_id = 1 and private and deal_ids none of ("deal-2", "deal-4") and deal_ids one of ("deal-1", "deal-3")"##,
+            r##"exchange_id = 1 and private and deal_ids none of ["deal-2", "deal-4"] and deal_ids one of ["deal-1", "deal-3"]"##,
             &attributes,
             &mut strings,
         );
@@ -921,7 +921,7 @@ mod tests {
         let attributes = define_attributes();
 
         let parsed = parse(
-            r##"deal_ids none of ("deal-2", "deal-4") or deal_ids one of ("deal-1", "deal-3")"##,
+            r##"deal_ids none of ["deal-2", "deal-4"] or deal_ids one of ["deal-1", "deal-3"]"##,
             &attributes,
             &mut strings,
         );
@@ -967,7 +967,7 @@ mod tests {
         let attributes = define_attributes();
 
         let parsed = parse(
-            r##"exchange_id = 1 or private or deal_ids none of ("deal-2", "deal-4")"##,
+            r##"exchange_id = 1 or private or deal_ids none of ["deal-2", "deal-4"]"##,
             &attributes,
             &mut strings,
         );
@@ -1015,7 +1015,7 @@ mod tests {
         let attributes = define_attributes();
 
         let parsed = parse(
-            r##"exchange_id = 1 or private or deal_ids none of ("deal-2", "deal-4") or deal_ids one of ("deal-1", "deal-3")"##,
+            r##"exchange_id = 1 or private or deal_ids none of ["deal-2", "deal-4"] or deal_ids one of ["deal-1", "deal-3"]"##,
             &attributes,
             &mut strings,
         );
@@ -1118,7 +1118,7 @@ mod tests {
         let attributes = define_attributes();
 
         let parsed = parse(
-            r##"(exchange_id = 1) and private and (deal_ids one of ("deal-1", "deal-2")) or (exchange_id = 2) and private and (deal_ids one of ("deal-3", "deal-4")) and (segment_ids one of (1, 2, 3, 4, 5, 6)) and (continent in ('NA')) and (country in ("US", "CA")) and (city in ("QC", "TN"))"##,
+            r##"(exchange_id = 1) and private and (deal_ids one of ["deal-1", "deal-2"]) or (exchange_id = 2) and private and (deal_ids one of ["deal-3", "deal-4"]) and (segment_ids one of [1, 2, 3, 4, 5, 6]) and (continent in ['NA']) and (country in ["US", "CA"]) and (city in ["QC", "TN"])"##,
             &attributes,
             &mut strings,
         );

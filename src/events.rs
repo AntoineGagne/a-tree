@@ -11,8 +11,6 @@ use thiserror::Error;
 pub enum EventError {
     #[error("attribute {0} has already been defined")]
     AlreadyPresent(String),
-    #[error("attribute {0} does not exist")]
-    NonExisting(String),
     #[error("event is missing some attributes")]
     MissingAttributes,
     #[error("ABE refers to non-existing attribute '{0:?}'")]
@@ -84,7 +82,7 @@ impl<'a> EventBuilder<'a> {
         let index = self
             .attributes
             .by_name(name)
-            .ok_or_else(|| EventError::NonExisting(name.to_string()))?;
+            .ok_or_else(|| EventError::NonExistingAttribute(name.to_string()))?;
         self.by_ids[index.0] = AttributeValue::Undefined;
         Ok(())
     }
@@ -108,7 +106,7 @@ impl<'a> EventBuilder<'a> {
         let index = self
             .attributes
             .by_name(name)
-            .ok_or_else(|| EventError::NonExisting(name.to_string()))?;
+            .ok_or_else(|| EventError::NonExistingAttribute(name.to_string()))?;
         let expected = self.attributes.by_id(index);
         if expected != actual {
             return Err(EventError::WrongType {
@@ -376,7 +374,7 @@ mod tests {
 
         let result = event_builder.with_boolean("non_existing", true);
 
-        assert!(matches!(result, Err(EventError::NonExisting(_))));
+        assert!(matches!(result, Err(EventError::NonExistingAttribute(_))));
     }
 
     #[test]

@@ -29,10 +29,10 @@ pub enum EventError {
     },
 }
 
-pub struct EventBuilder<'a> {
+pub struct EventBuilder<'atree> {
     by_ids: Vec<AttributeValue>,
-    attributes: &'a AttributeTable,
-    strings: &'a StringTable,
+    attributes: &'atree AttributeTable,
+    strings: &'atree StringTable,
 }
 
 impl<'atree> EventBuilder<'atree> {

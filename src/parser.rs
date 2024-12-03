@@ -13,6 +13,7 @@ use self::grammar::TreeParser;
 
 pub type ATreeParseError<'a> = ParseError<usize, Token<'a>, ParserError>;
 
+#[inline]
 pub fn parse<'a>(
     input: &'a str,
     attributes: &AttributeTable,

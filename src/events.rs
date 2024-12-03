@@ -171,14 +171,17 @@ impl AttributeTable {
         Ok(Self { by_names, by_ids })
     }
 
+    #[inline]
     pub fn by_name(&self, name: &str) -> Option<AttributeIndex> {
         self.by_names.get(name).cloned()
     }
 
+    #[inline]
     pub fn by_id(&self, id: AttributeIndex) -> AttributeKind {
         self.by_ids[id.0].clone()
     }
 
+    #[inline]
     pub fn len(&self) -> usize {
         self.by_ids.len()
     }

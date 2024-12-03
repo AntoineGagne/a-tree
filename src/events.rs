@@ -2,6 +2,7 @@ use crate::{
     predicates::PredicateKind,
     strings::{StringId, StringTable},
 };
+use itertools::Itertools;
 use rust_decimal::Decimal;
 use std::collections::HashMap;
 use thiserror::Error;
@@ -74,8 +75,7 @@ impl<'a> EventBuilder<'a> {
 
     pub fn with_integer_list(&mut self, name: &str, value: &[i64]) -> Result<(), EventError> {
         self.add_value(name, AttributeKind::IntegerList, || {
-            let mut values = value.to_vec();
-            values.sort();
+            let values = value.iter().sorted().unique().cloned().collect_vec();
             AttributeValue::IntegerList(values)
         })
     }
@@ -91,8 +91,12 @@ impl<'a> EventBuilder<'a> {
 
     pub fn with_string_list(&mut self, name: &str, values: &[&str]) -> Result<(), EventError> {
         self.add_value(name, AttributeKind::StringList, || {
-            let mut values: Vec<_> = values.iter().map(|v| self.strings.get(v)).collect();
-            values.sort();
+            let values: Vec<_> = values
+                .iter()
+                .map(|v| self.strings.get(v))
+                .sorted()
+                .unique()
+                .collect();
             AttributeValue::StringList(values)
         })
     }

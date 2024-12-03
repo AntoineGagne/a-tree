@@ -28,15 +28,18 @@ impl Predicate {
             })
     }
 
-    pub fn evaluate(&self, event: &Event) -> bool {
+    pub fn evaluate(&self, event: &Event) -> Option<bool> {
         let value = event.get(&self.attribute);
         match (&self.kind, value) {
-            (PredicateKind::Variable, AttributeValue::Boolean(value)) => *value,
-            (PredicateKind::Null(operator), value) => operator.evaluate(value),
-            (PredicateKind::Set(operator, haystack), needle) => operator.evaluate(haystack, needle),
-            (PredicateKind::Comparison(operator, a), b) => operator.evaluate(a, b),
-            (PredicateKind::Equality(operator, a), b) => operator.evaluate(a, b),
-            (PredicateKind::List(operator, a), b) => operator.evaluate(a, b),
+            (PredicateKind::Null(operator), value) => Some(operator.evaluate(value)),
+            (_, AttributeValue::Undefined) => None,
+            (PredicateKind::Variable, AttributeValue::Boolean(value)) => Some(*value),
+            (PredicateKind::Set(operator, haystack), needle) => {
+                Some(operator.evaluate(haystack, needle))
+            }
+            (PredicateKind::Comparison(operator, a), b) => Some(operator.evaluate(a, b)),
+            (PredicateKind::Equality(operator, a), b) => Some(operator.evaluate(a, b)),
+            (PredicateKind::List(operator, a), b) => Some(operator.evaluate(a, b)),
             (kind, value) => {
                 unreachable!("Invalid => got: {kind:?} with {value:?}");
             }
@@ -344,7 +347,7 @@ mod tests {
         let event = builder.build().unwrap();
         let predicate = Predicate::new(&attributes, "private", PredicateKind::Variable).unwrap();
 
-        assert!(predicate.evaluate(&event));
+        assert_eq!(Some(true), predicate.evaluate(&event));
     }
 
     #[test]
@@ -356,7 +359,7 @@ mod tests {
         let event = builder.build().unwrap();
         let predicate = Predicate::new(&attributes, "private", PredicateKind::Variable).unwrap();
 
-        assert!(!predicate.evaluate(&event));
+        assert_eq!(Some(false), predicate.evaluate(&event));
     }
 
     #[test]
@@ -371,7 +374,7 @@ mod tests {
         )
         .unwrap();
 
-        assert!(!predicate.evaluate(&event));
+        assert_eq!(Some(false), predicate.evaluate(&event));
     }
 
     #[test]
@@ -388,7 +391,7 @@ mod tests {
         )
         .unwrap();
 
-        assert!(predicate.evaluate(&event));
+        assert_eq!(Some(true), predicate.evaluate(&event));
     }
 
     #[test]
@@ -403,7 +406,7 @@ mod tests {
         )
         .unwrap();
 
-        assert!(predicate.evaluate(&event));
+        assert_eq!(Some(true), predicate.evaluate(&event));
     }
 
     #[test]
@@ -420,7 +423,7 @@ mod tests {
         )
         .unwrap();
 
-        assert!(!predicate.evaluate(&event));
+        assert_eq!(Some(false), predicate.evaluate(&event));
     }
 
     #[test]
@@ -437,7 +440,7 @@ mod tests {
         )
         .unwrap();
 
-        assert!(predicate.evaluate(&event));
+        assert_eq!(Some(true), predicate.evaluate(&event));
     }
 
     #[test]
@@ -456,7 +459,7 @@ mod tests {
         )
         .unwrap();
 
-        assert!(!predicate.evaluate(&event));
+        assert_eq!(Some(false), predicate.evaluate(&event));
     }
 
     #[test]
@@ -473,7 +476,7 @@ mod tests {
         )
         .unwrap();
 
-        assert!(!predicate.evaluate(&event));
+        assert_eq!(Some(false), predicate.evaluate(&event));
     }
 
     #[test]
@@ -493,7 +496,7 @@ mod tests {
         )
         .unwrap();
 
-        assert!(!predicate.evaluate(&event));
+        assert_eq!(Some(false), predicate.evaluate(&event));
     }
 
     #[test]
@@ -513,7 +516,7 @@ mod tests {
         )
         .unwrap();
 
-        assert!(predicate.evaluate(&event));
+        assert_eq!(Some(true), predicate.evaluate(&event));
     }
 
     #[test]
@@ -530,7 +533,7 @@ mod tests {
         )
         .unwrap();
 
-        assert!(predicate.evaluate(&event));
+        assert_eq!(Some(true), predicate.evaluate(&event));
     }
 
     #[test]
@@ -551,7 +554,7 @@ mod tests {
         )
         .unwrap();
 
-        assert!(predicate.evaluate(&event));
+        assert_eq!(Some(true), predicate.evaluate(&event));
     }
 
     #[test]
@@ -572,7 +575,7 @@ mod tests {
         )
         .unwrap();
 
-        assert!(!predicate.evaluate(&event));
+        assert_eq!(Some(false), predicate.evaluate(&event));
     }
 
     #[test]
@@ -590,7 +593,7 @@ mod tests {
         )
         .unwrap();
 
-        assert!(predicate.evaluate(&event));
+        assert_eq!(Some(true), predicate.evaluate(&event));
     }
 
     #[test]
@@ -612,7 +615,7 @@ mod tests {
         )
         .unwrap();
 
-        assert!(!predicate.evaluate(&event));
+        assert_eq!(Some(false), predicate.evaluate(&event));
     }
 
     #[test]
@@ -633,7 +636,7 @@ mod tests {
         )
         .unwrap();
 
-        assert!(!predicate.evaluate(&event));
+        assert_eq!(Some(false), predicate.evaluate(&event));
     }
 
     #[test]
@@ -655,7 +658,7 @@ mod tests {
         )
         .unwrap();
 
-        assert!(predicate.evaluate(&event));
+        assert_eq!(Some(true), predicate.evaluate(&event));
     }
 
     #[test]
@@ -676,7 +679,7 @@ mod tests {
         )
         .unwrap();
 
-        assert!(predicate.evaluate(&event));
+        assert_eq!(Some(true), predicate.evaluate(&event));
     }
 
     #[test]
@@ -698,7 +701,7 @@ mod tests {
         )
         .unwrap();
 
-        assert!(predicate.evaluate(&event));
+        assert_eq!(Some(true), predicate.evaluate(&event));
     }
 
     #[test]
@@ -719,7 +722,7 @@ mod tests {
         )
         .unwrap();
 
-        assert!(predicate.evaluate(&event));
+        assert_eq!(Some(true), predicate.evaluate(&event));
     }
 
     #[test]
@@ -740,7 +743,7 @@ mod tests {
         )
         .unwrap();
 
-        assert!(predicate.evaluate(&event));
+        assert_eq!(Some(true), predicate.evaluate(&event));
     }
 
     #[test]
@@ -760,7 +763,7 @@ mod tests {
         )
         .unwrap();
 
-        assert!(!predicate.evaluate(&event));
+        assert_eq!(Some(false), predicate.evaluate(&event));
     }
 
     #[test]
@@ -783,7 +786,7 @@ mod tests {
         )
         .unwrap();
 
-        assert!(predicate.evaluate(&event));
+        assert_eq!(Some(true), predicate.evaluate(&event));
     }
 
     #[test]
@@ -809,7 +812,7 @@ mod tests {
         )
         .unwrap();
 
-        assert!(!predicate.evaluate(&event));
+        assert_eq!(Some(false), predicate.evaluate(&event));
     }
 
     #[test]
@@ -851,8 +854,8 @@ mod tests {
         )
         .unwrap();
 
-        assert!(!predicate.evaluate(&event));
-        assert!(!predicate_2.evaluate(&event_2));
+        assert_eq!(Some(false), predicate.evaluate(&event));
+        assert_eq!(Some(false), predicate_2.evaluate(&event_2));
     }
 
     #[test]
@@ -880,7 +883,7 @@ mod tests {
         )
         .unwrap();
 
-        assert!(predicate.evaluate(&event));
+        assert_eq!(Some(true), predicate.evaluate(&event));
     }
 
     #[test]
@@ -901,7 +904,7 @@ mod tests {
         )
         .unwrap();
 
-        assert!(!predicate.evaluate(&event));
+        assert_eq!(Some(false), predicate.evaluate(&event));
     }
 
     #[test]
@@ -921,7 +924,7 @@ mod tests {
         )
         .unwrap();
 
-        assert!(!predicate.evaluate(&event));
+        assert_eq!(Some(false), predicate.evaluate(&event));
     }
 
     #[test]
@@ -941,7 +944,7 @@ mod tests {
         )
         .unwrap();
 
-        assert!(predicate.evaluate(&event));
+        assert_eq!(Some(true), predicate.evaluate(&event));
     }
 
     #[test]
@@ -961,7 +964,7 @@ mod tests {
         )
         .unwrap();
 
-        assert!(!predicate.evaluate(&event));
+        assert_eq!(Some(false), predicate.evaluate(&event));
     }
 
     #[test]
@@ -984,7 +987,7 @@ mod tests {
         )
         .unwrap();
 
-        assert!(predicate.evaluate(&event));
+        assert_eq!(Some(true), predicate.evaluate(&event));
     }
 
     #[test]
@@ -1007,7 +1010,7 @@ mod tests {
         )
         .unwrap();
 
-        assert!(!predicate.evaluate(&event));
+        assert_eq!(Some(false), predicate.evaluate(&event));
     }
 
     #[test]
@@ -1028,7 +1031,7 @@ mod tests {
         )
         .unwrap();
 
-        assert!(predicate.evaluate(&event));
+        assert_eq!(Some(true), predicate.evaluate(&event));
     }
 
     #[test]
@@ -1048,7 +1051,25 @@ mod tests {
         )
         .unwrap();
 
-        assert!(predicate.evaluate(&event));
+        assert_eq!(Some(true), predicate.evaluate(&event));
+    }
+
+    #[test]
+    fn return_none_when_the_attribute_is_undefined() {
+        let attributes = define_attributes();
+        let strings = StringTable::new();
+        let mut builder = an_event_builder(&attributes, &strings);
+        builder.with_undefined("segment_ids").unwrap();
+        let event = builder.build().unwrap();
+
+        let predicate = Predicate::new(
+            &attributes,
+            "segment_ids",
+            PredicateKind::List(ListOperator::NoneOf, ListLiteral::IntegerList(vec![])),
+        )
+        .unwrap();
+
+        assert_eq!(None, predicate.evaluate(&event));
     }
 
     fn define_attributes() -> AttributeTable {

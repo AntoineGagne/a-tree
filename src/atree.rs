@@ -95,6 +95,8 @@ pub enum Operator {
 mod tests {
     use super::*;
 
+    const AN_INVALID_BOOLEAN_EXPRESSION: &str = "invalid in (1, 2, 3 and";
+
     #[test]
     fn can_build_an_atree() {
         let definitions = [
@@ -124,6 +126,22 @@ mod tests {
         ];
 
         let result = ATree::new(&definitions);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn return_an_error_on_invalid_boolean_expression() {
+        let definitions = [
+            AttributeDefinition::boolean("private"),
+            AttributeDefinition::string("country"),
+            AttributeDefinition::string_list("deals"),
+            AttributeDefinition::integer("exchange_id"),
+            AttributeDefinition::integer_list("segment_ids"),
+        ];
+        let mut atree = ATree::new(&definitions).unwrap();
+
+        let result = atree.insert(AN_INVALID_BOOLEAN_EXPRESSION);
 
         assert!(result.is_err());
     }

@@ -4,7 +4,7 @@ use crate::{
 };
 use itertools::Itertools;
 use rust_decimal::Decimal;
-use std::collections::HashMap;
+use std::{collections::HashMap, ops::Index};
 use thiserror::Error;
 
 #[derive(Error, PartialEq, Debug)]
@@ -125,8 +125,11 @@ impl<'a> EventBuilder<'a> {
 /// An event that can be used by the [`crate::atree::ATree`] structure to match ABE.
 pub struct Event(Vec<AttributeValue>);
 
-impl Event {
-    pub fn get(&self, index: &AttributeIndex) -> &AttributeValue {
+impl Index<AttributeIndex> for Event {
+    type Output = AttributeValue;
+
+    #[inline]
+    fn index(&self, index: AttributeIndex) -> &Self::Output {
         &self.0[index.0]
     }
 }

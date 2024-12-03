@@ -29,7 +29,7 @@ impl Predicate {
     }
 
     pub fn evaluate(&self, event: &Event) -> Option<bool> {
-        let value = event.get(&self.attribute);
+        let value = &event[self.attribute];
         match (&self.kind, value) {
             (PredicateKind::Null(operator), value) => Some(operator.evaluate(value)),
             (_, AttributeValue::Undefined) => None,

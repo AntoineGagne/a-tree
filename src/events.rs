@@ -35,8 +35,8 @@ pub struct EventBuilder<'a> {
     strings: &'a StringTable,
 }
 
-impl<'a> EventBuilder<'a> {
-    pub(crate) fn new(attributes: &'a AttributeTable, strings: &'a StringTable) -> Self {
+impl<'atree> EventBuilder<'atree> {
+    pub(crate) fn new(attributes: &'atree AttributeTable, strings: &'atree StringTable) -> Self {
         Self {
             attributes,
             strings,

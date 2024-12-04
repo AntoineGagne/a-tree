@@ -333,6 +333,8 @@ mod tests {
         events::{AttributeDefinition, AttributeTable, EventBuilder},
         strings::StringTable,
     };
+    use itertools::Itertools;
+    use proptest::prelude::{proptest, *};
 
     const AN_EXCHANGE_ID: i64 = 23;
     const A_COUNTRY: &str = "CA";
@@ -1072,6 +1074,71 @@ mod tests {
         assert_eq!(None, predicate.evaluate(&event));
     }
 
+    proptest! {
+        #[test]
+        fn can_find_an_element_if_it_is_present_in_the_input((value, index) in vec_and_index()) {
+            let attributes = define_attributes();
+            let strings = StringTable::new();
+            let mut builder = an_event_builder(&attributes, &strings);
+            builder
+                .with_integer("exchange_id", value[index])
+                .unwrap();
+            let event = builder.build().unwrap();
+
+            let predicate = Predicate::new(
+                &attributes,
+                "exchange_id",
+                PredicateKind::Set(SetOperator::In, ListLiteral::IntegerList(value)),
+            )
+            .unwrap();
+
+            assert_eq!(Some(true), predicate.evaluate(&event));
+        }
+
+        #[test]
+        fn can_find_an_element_common_from_both_lists((value, index) in vec_and_index(), (mut variable, variable_index) in vec_and_index()) {
+            variable[variable_index] = value[index];
+            let variable = variable.into_iter().sorted().unique().collect_vec();
+
+            let attributes = define_attributes();
+            let strings = StringTable::new();
+            let mut builder = an_event_builder(&attributes, &strings);
+            builder
+                .with_integer_list("segment_ids", &variable)
+                .unwrap();
+            let event = builder.build().unwrap();
+
+            let predicate = Predicate::new(
+                &attributes,
+                "segment_ids",
+                PredicateKind::List(ListOperator::OneOf, ListLiteral::IntegerList(value)),
+            )
+            .unwrap();
+
+            assert_eq!(Some(true), predicate.evaluate(&event));
+        }
+
+        #[test]
+        fn can_find_a_subset_if_it_is_present_in_the_input((value, index) in vec_and_index()) {
+            let attributes = define_attributes();
+            let strings = StringTable::new();
+            let mut builder = an_event_builder(&attributes, &strings);
+            builder
+                .with_integer_list("segment_ids", &value[index..value.len()])
+                .unwrap();
+            let event = builder.build().unwrap();
+
+            let predicate = Predicate::new(
+                &attributes,
+                "segment_ids",
+                PredicateKind::List(ListOperator::AllOf, ListLiteral::IntegerList(value)),
+            )
+            .unwrap();
+
+            assert_eq!(Some(true), predicate.evaluate(&event));
+        }
+    }
+
     fn define_attributes() -> AttributeTable {
         let definitions = vec![
             AttributeDefinition::string_list("deals"),
@@ -1099,5 +1166,13 @@ mod tests {
         assert!(builder.with_integer_list("segment_ids", &[1, 2, 3]).is_ok());
         assert!(builder.with_string("country", A_COUNTRY).is_ok());
         builder
+    }
+
+    fn vec_and_index() -> impl Strategy<Value = (Vec<i64>, usize)> {
+        prop::collection::vec(any::<i64>(), 1..100).prop_flat_map(|vec| {
+            let vec = vec.into_iter().sorted().unique().collect_vec();
+            let length = vec.len();
+            (Just(vec), 0..length)
+        })
     }
 }

@@ -40,16 +40,36 @@ impl ATree {
         })
     }
 
+    /// Insert an arbitrary boolean expression inside the [`ATree`].
     pub fn insert<'a, 'tree: 'a>(&'tree mut self, abe: &'a str) -> Result<usize, ATreeError<'a>> {
         let ast = parser::parse(abe, &self.attributes, &mut self.strings)
             .map_err(ATreeError::ParseError)?;
         ATreeNode::from_abe(self, ast)
     }
 
+    /// Create a new [`EventBuilder`] to be able to generate an [`Event`] that will be usable for
+    /// finding the matching ABEs inside the [`ATree`] via the [`Self::search()`] function.
+    ///
+    /// By default, the non-assigned attributes will be undefined.
+    ///
+    /// ```rust
+    /// use a_tree::{ATree, AttributeDefinition};
+    ///
+    /// let definitions = [
+    ///     AttributeDefinition::boolean("private"),
+    ///     AttributeDefinition::integer("exchange_id")
+    /// ];
+    /// let atree = ATree::new(&definitions).unwrap();
+    ///
+    /// let mut builder = atree.make_event();
+    /// assert!(builder.with_integer("exchange_id", 1).is_ok());
+    /// assert!(builder.with_boolean("private", false).is_ok());
+    /// ```
     pub fn make_event(&self) -> EventBuilder {
         EventBuilder::new(&self.attributes, &self.strings)
     }
 
+    /// Search the [`ATree`] for arbitrary boolean expressions that match the [`Event`].
     pub fn search(&self, _event: Event) -> Result<Report, ATreeError> {
         Ok(Report)
     }

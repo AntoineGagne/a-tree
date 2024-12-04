@@ -13,7 +13,7 @@ The A-Tree data structure is used to evaluate a large amount of boolean expressi
 
 # Domain Specific Language
 
-To easily create ABEs, the library supports a domain specific language (DSL) that allows for easy configuration. The DSL supports the following:
+To easily create arbitrary boolean expressions (ABE), the library supports a domain specific language (DSL) that allows for easy configuration. The DSL supports the following:
 
 * Boolean operators: `and` (`&&`), `or` (`||`), `not` (`!`) and `variable` where `variable` is a defined attribute for the A-Tree;
 * Comparison: `<`, `<=`, `>`, `>=`. They work for `integer` and `float`;

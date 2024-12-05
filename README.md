@@ -26,7 +26,6 @@ As an example, the following would all be valid ABEs:
 
 ```text
 (exchange_id = 1 and deals one of ["deal-1", "deal-2", "deal-3"]) and (segment_ids one of [1, 2, 3]) and (continent = 'NA' and country in ["US", "CA"])
-
 (log_level >= 1) and (month in [1, 2, 3] and day in [15, 16]) or (month in [4, 5, 6] and day in [10, 11])
 ```
 

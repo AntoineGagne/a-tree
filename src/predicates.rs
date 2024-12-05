@@ -4,7 +4,7 @@ use crate::{
 };
 use rust_decimal::Decimal;
 
-#[derive(Hash, Debug, Clone, PartialEq)]
+#[derive(Eq, PartialEq, Hash, Debug, Clone)]
 pub struct Predicate {
     attribute: AttributeIndex,
     kind: PredicateKind,
@@ -88,7 +88,7 @@ fn validate_predicate(
     }
 }
 
-#[derive(Hash, PartialEq, Clone, Debug)]
+#[derive(Hash, Eq, PartialEq, Clone, Debug)]
 pub enum PredicateKind {
     Variable,
     Set(SetOperator, ListLiteral),
@@ -98,7 +98,7 @@ pub enum PredicateKind {
     Null(NullOperator),
 }
 
-#[derive(Hash, PartialEq, Clone, Debug)]
+#[derive(Hash, Eq, PartialEq, Clone, Debug)]
 pub enum SetOperator {
     NotIn,
     In,
@@ -127,7 +127,7 @@ impl SetOperator {
     }
 }
 
-#[derive(Hash, PartialEq, Clone, Debug)]
+#[derive(Hash, Eq, PartialEq, Clone, Debug)]
 pub enum ComparisonOperator {
     LessThan,
     LessThanEqual,
@@ -156,13 +156,13 @@ impl ComparisonOperator {
     }
 }
 
-#[derive(Hash, PartialEq, Clone, Debug)]
+#[derive(Hash, Eq, PartialEq, Clone, Debug)]
 pub enum ComparisonValue {
     Integer(i64),
     Float(Decimal),
 }
 
-#[derive(Hash, PartialEq, Clone, Debug)]
+#[derive(Hash, Eq, PartialEq, Clone, Debug)]
 pub enum EqualityOperator {
     Equal,
     NotEqual,
@@ -188,7 +188,7 @@ impl EqualityOperator {
     }
 }
 
-#[derive(Hash, PartialEq, Clone, Debug)]
+#[derive(Hash, Eq, PartialEq, Clone, Debug)]
 #[allow(clippy::enum_variant_names)]
 pub enum ListOperator {
     OneOf,
@@ -281,7 +281,7 @@ fn all_of<T: Ord>(left: &[T], right: &[T]) -> bool {
     j >= left.len()
 }
 
-#[derive(Hash, PartialEq, Clone, Debug)]
+#[derive(Hash, Eq, PartialEq, Clone, Debug)]
 #[allow(clippy::enum_variant_names)]
 pub enum NullOperator {
     IsNull,
@@ -313,13 +313,13 @@ impl NullOperator {
     }
 }
 
-#[derive(Hash, PartialEq, Clone, Debug)]
+#[derive(Hash, Eq, PartialEq, Clone, Debug)]
 pub enum ListLiteral {
     IntegerList(Vec<i64>),
     StringList(Vec<StringId>),
 }
 
-#[derive(Hash, PartialEq, Clone, Debug)]
+#[derive(Hash, Eq, PartialEq, Clone, Debug)]
 pub enum PrimitiveLiteral {
     Integer(i64),
     Float(Decimal),

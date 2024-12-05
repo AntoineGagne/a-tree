@@ -9,12 +9,14 @@ use crate::{
     predicates::Predicate,
     strings::StringTable,
 };
+use std::collections::{hash_map::RandomState, HashMap};
 
 /// The A-Tree data structure as described by the paper.
 pub struct ATree {
-    nodes: Vec<usize>,
+    nodes: Vec<ATreeNode>,
     strings: StringTable,
     attributes: AttributeTable,
+    expression_to_node: HashMap<usize, ATreeNode>,
 }
 
 impl ATree {
@@ -48,7 +50,7 @@ impl ATree {
     }
 
     /// Create a new [`EventBuilder`] to be able to generate an [`Event`] that will be usable for
-    /// finding the matching ABEs inside the [`ATree`] via the [`Self::search()`] function.
+    /// finding the matching ABEs inside the [`ATree`] via the [`ATree::search()`] function.
     ///
     /// By default, the non-assigned attributes will be undefined.
     ///

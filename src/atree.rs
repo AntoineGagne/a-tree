@@ -39,6 +39,7 @@ impl ATree {
             attributes,
             strings,
             nodes: vec![],
+            expression_to_node: HashMap::default(),
         })
     }
 
@@ -46,7 +47,29 @@ impl ATree {
     pub fn insert<'a, 'tree: 'a>(&'tree mut self, abe: &'a str) -> Result<usize, ATreeError<'a>> {
         let ast = parser::parse(abe, &self.attributes, &mut self.strings)
             .map_err(ATreeError::ParseError)?;
-        ATreeNode::from_abe(self, ast)
+        self.insert_root(ast)
+    }
+
+    fn insert_root(&mut self, root: Node) -> Result<usize, ATreeError> {
+        let rnode = match root {
+            Node::And(left, right) | Node::Or(left, right) => {
+                unimplemented!();
+            }
+            Node::Not(child) => {
+                unimplemented!();
+            }
+            Node::Value(value) => RNode {
+                operator: Operator::Value,
+                level: 2,
+                children: vec![],
+            },
+        };
+        let rnode = ATreeNode::RNode(rnode);
+        Ok(1)
+    }
+
+    fn insert_node(&mut self, node: &Node) -> Result<usize, ATreeError> {
+        unimplemented!();
     }
 
     /// Create a new [`EventBuilder`] to be able to generate an [`Event`] that will be usable for
@@ -77,41 +100,49 @@ impl ATree {
     }
 }
 
-pub struct Report;
-
 enum ATreeNode {
-    LNode {
-        id: usize,
-        parents: Vec<usize>,
-        level: usize,
-        predicate: Predicate,
-    },
-    INode {
-        id: usize,
-        parents: Vec<usize>,
-        children: Vec<usize>,
-        level: usize,
-        operator: Operator,
-    },
-    RNode {
-        id: usize,
-        children: Vec<usize>,
-        level: usize,
-        operator: Operator,
-    },
+    LNode(LNode),
+    INode(INode),
+    RNode(RNode),
 }
 
 impl ATreeNode {
-    fn from_abe(a_tree: &mut ATree, abe: Node) -> Result<usize, ATreeError> {
-        unimplemented!();
+    const fn level(&self) -> usize {
+        match self {
+            ATreeNode::RNode(node) => node.level,
+            ATreeNode::LNode(node) => node.level,
+            ATreeNode::INode(node) => node.level,
+        }
     }
+}
+
+struct LNode {
+    parents: Vec<usize>,
+    level: usize,
+    predicate: Predicate,
+}
+
+struct INode {
+    parents: Vec<usize>,
+    children: Vec<usize>,
+    level: usize,
+    operator: Operator,
+}
+
+struct RNode {
+    children: Vec<usize>,
+    level: usize,
+    operator: Operator,
 }
 
 pub enum Operator {
     And,
     Or,
     Not,
+    Value,
 }
+
+pub struct Report;
 
 #[cfg(test)]
 mod tests {

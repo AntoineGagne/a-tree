@@ -1076,7 +1076,7 @@ mod tests {
 
     proptest! {
         #[test]
-        fn can_find_an_element_if_it_is_present_in_the_input((value, index) in vec_and_index()) {
+        fn can_find_an_element_if_it_is_present_in_the_input((value, index, _) in vec_and_index()) {
             let attributes = define_attributes();
             let strings = StringTable::new();
             let mut builder = an_event_builder(&attributes, &strings);
@@ -1096,7 +1096,7 @@ mod tests {
         }
 
         #[test]
-        fn can_find_an_element_common_from_both_lists((value, index) in vec_and_index(), (mut variable, variable_index) in vec_and_index()) {
+        fn can_find_an_element_common_from_both_lists((value, index, _) in vec_and_index(), (mut variable, variable_index, _) in vec_and_index()) {
             variable[variable_index] = value[index];
             let variable = variable.into_iter().sorted().unique().collect_vec();
 
@@ -1119,12 +1119,14 @@ mod tests {
         }
 
         #[test]
-        fn can_find_a_subset_if_it_is_present_in_the_input((value, index) in vec_and_index()) {
+        fn can_find_a_subset_if_it_is_present_in_the_input((value, index, index_2) in vec_and_index()) {
             let attributes = define_attributes();
             let strings = StringTable::new();
             let mut builder = an_event_builder(&attributes, &strings);
+            let start = std::cmp::min(index, index_2);
+            let end = std::cmp::max(index, index_2);
             builder
-                .with_integer_list("segment_ids", &value[index..value.len()])
+                .with_integer_list("segment_ids", &value[start..end])
                 .unwrap();
             let event = builder.build().unwrap();
 
@@ -1168,11 +1170,11 @@ mod tests {
         builder
     }
 
-    fn vec_and_index() -> impl Strategy<Value = (Vec<i64>, usize)> {
+    fn vec_and_index() -> impl Strategy<Value = (Vec<i64>, usize, usize)> {
         prop::collection::vec(any::<i64>(), 1..100).prop_flat_map(|vec| {
             let vec = vec.into_iter().sorted().unique().collect_vec();
             let length = vec.len();
-            (Just(vec), 0..length)
+            (Just(vec), 0..length, 0..length)
         })
     }
 }

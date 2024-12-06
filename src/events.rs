@@ -123,11 +123,11 @@ impl<'atree> EventBuilder<'atree> {
 /// An event that can be used by the [`crate::atree::ATree`] structure to match ABE.
 pub struct Event(Vec<AttributeValue>);
 
-impl Index<AttributeIndex> for Event {
+impl Index<AttributeId> for Event {
     type Output = AttributeValue;
 
     #[inline]
-    fn index(&self, index: AttributeIndex) -> &Self::Output {
+    fn index(&self, index: AttributeId) -> &Self::Output {
         &self.0[index.0]
     }
 }
@@ -144,12 +144,12 @@ pub enum AttributeValue {
 }
 
 pub struct AttributeTable {
-    by_names: HashMap<String, AttributeIndex>,
+    by_names: HashMap<String, AttributeId>,
     by_ids: Vec<AttributeKind>,
 }
 
 #[derive(Clone, Copy, Eq, Ord, PartialEq, PartialOrd, Debug, Hash)]
-pub struct AttributeIndex(usize);
+pub struct AttributeId(usize);
 
 impl AttributeTable {
     pub fn new(definitions: &[AttributeDefinition]) -> Result<Self, EventError> {
@@ -162,7 +162,7 @@ impl AttributeTable {
                 return Err(EventError::AlreadyPresent(name));
             }
 
-            by_names.insert(name, AttributeIndex(i));
+            by_names.insert(name, AttributeId(i));
             by_ids.push(definition.kind.clone());
         }
 
@@ -170,12 +170,12 @@ impl AttributeTable {
     }
 
     #[inline]
-    pub fn by_name(&self, name: &str) -> Option<AttributeIndex> {
+    pub fn by_name(&self, name: &str) -> Option<AttributeId> {
         self.by_names.get(name).cloned()
     }
 
     #[inline]
-    pub fn by_id(&self, id: AttributeIndex) -> AttributeKind {
+    pub fn by_id(&self, id: AttributeId) -> AttributeKind {
         self.by_ids[id.0].clone()
     }
 

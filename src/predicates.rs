@@ -1,12 +1,12 @@
 use crate::{
-    events::{AttributeIndex, AttributeKind, AttributeTable, AttributeValue, Event, EventError},
+    events::{AttributeId, AttributeKind, AttributeTable, AttributeValue, Event, EventError},
     strings::StringId,
 };
 use rust_decimal::Decimal;
 
 #[derive(Eq, PartialEq, Hash, Debug, Clone)]
 pub struct Predicate {
-    attribute: AttributeIndex,
+    attribute: AttributeId,
     kind: PredicateKind,
 }
 

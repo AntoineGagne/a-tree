@@ -2,7 +2,7 @@ use crate::{
     ast::{self, *},
     error::ATreeError,
     events::{
-        AttributeDefinition, AttributeIndex, AttributeKind, AttributeTable, Event, EventBuilder,
+        AttributeDefinition, AttributeId, AttributeKind, AttributeTable, Event, EventBuilder,
         EventError,
     },
     parser,
@@ -16,7 +16,7 @@ pub struct ATree {
     nodes: Vec<ATreeNode>,
     strings: StringTable,
     attributes: AttributeTable,
-    expression_to_node: HashMap<usize, ATreeNode>,
+    expression_to_node: HashMap<usize, usize>,
 }
 
 impl ATree {

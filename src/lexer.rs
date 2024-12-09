@@ -78,7 +78,7 @@ pub enum Token<'source> {
     Identifier(&'source str),
 }
 
-impl<'source> std::fmt::Display for Token<'source> {
+impl std::fmt::Display for Token<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", self)
     }

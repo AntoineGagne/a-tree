@@ -1,6 +1,7 @@
 use crate::{
     ast::{self, *},
     error::ATreeError,
+    evaluation::EvaluationResult,
     events::{
         AttributeDefinition, AttributeId, AttributeKind, AttributeTable, Event, EventBuilder,
         EventError,
@@ -96,7 +97,7 @@ impl ATree {
 
     /// Search the [`ATree`] for arbitrary boolean expressions that match the [`Event`].
     pub fn search(&self, _event: Event) -> Result<Report, ATreeError> {
-        Ok(Report)
+        Ok(Report::new(self.nodes.len()))
     }
 }
 
@@ -142,7 +143,17 @@ pub enum Operator {
     Value,
 }
 
-pub struct Report;
+pub struct Report {
+    evaluation: EvaluationResult,
+}
+
+impl Report {
+    fn new(nodes: usize) -> Self {
+        Self {
+            evaluation: EvaluationResult::new(nodes),
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {

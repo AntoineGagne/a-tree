@@ -2,6 +2,7 @@
 mod ast;
 mod atree;
 mod error;
+mod evaluation;
 mod events;
 mod lexer;
 mod parser;

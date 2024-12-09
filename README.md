@@ -1,7 +1,5 @@
 # a-tree
 
-> A Dynamic Data Structure for Efficiently Indexing Arbitrary Boolean Expressions.
-
 [![Rust](https://github.com/AntoineGagne/a-tree/actions/workflows/check.yml/badge.svg)](https://github.com/AntoineGagne/a-tree/actions/workflows/check.yml)
 [![codecov](https://codecov.io/gh/AntoineGagne/a-tree/graph/badge.svg?token=JUKK1W5L2D)](https://codecov.io/gh/AntoineGagne/a-tree)
 

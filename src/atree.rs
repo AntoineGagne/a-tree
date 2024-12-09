@@ -22,10 +22,13 @@ pub struct ATree {
     nodes: Slab<ATreeNode>,
     strings: StringTable,
     attributes: AttributeTable,
+    predicates: Vec<NodeId>,
     expression_to_node: BiMap<ExpressionId, NodeId>,
 }
 
 impl ATree {
+    const DEFAULT_PREDICATES: usize = 200;
+
     /// Create a new [`ATree`] with the specified attribute definitions.
     ///
     /// ```rust
@@ -44,6 +47,7 @@ impl ATree {
         Ok(Self {
             attributes,
             strings,
+            predicates: Vec::with_capacity(Self::DEFAULT_PREDICATES),
             nodes: Slab::new(),
             expression_to_node: BiMap::new(),
         })
@@ -60,8 +64,18 @@ impl ATree {
         let rnode = match &root {
             Node::And(left, right) | Node::Or(left, right) => {
                 let nodes = &mut self.nodes;
-                let left_id = insert_node(nodes, &mut self.expression_to_node, &*left)?;
-                let right_id = insert_node(nodes, &mut self.expression_to_node, &*right)?;
+                let left_id = insert_node(
+                    &mut self.predicates,
+                    nodes,
+                    &mut self.expression_to_node,
+                    &*left,
+                )?;
+                let right_id = insert_node(
+                    &mut self.predicates,
+                    nodes,
+                    &mut self.expression_to_node,
+                    &*right,
+                )?;
                 let mut left_node = nodes[left_id].borrow_mut();
                 let mut right_node = nodes[right_id].borrow_mut();
                 let rnode = RNode {
@@ -118,6 +132,7 @@ impl ATree {
 }
 
 fn insert_node<'atree, 'a>(
+    predicates: &'atree mut Vec<NodeId>,
     nodes: &'atree mut Slab<ATreeNode>,
     expression_to_node: &'atree mut BiMap<ExpressionId, NodeId>,
     node: &'a Node,
@@ -136,15 +151,16 @@ fn insert_node<'atree, 'a>(
                     parents: vec![],
                     predicate: node.clone(),
                 });
-                let arena_id = nodes.insert(lnode);
+                let node_id = nodes.insert(lnode);
                 // TODO: Revisit this arena_id
-                expression_to_node.insert_no_overwrite(expression_id, arena_id);
-                arena_id
+                expression_to_node.insert_no_overwrite(expression_id, node_id);
+                predicates.push(node_id);
+                node_id
             };
             Ok(node_id)
         }
         Node::Not(node) => {
-            let child_id = insert_node(nodes, expression_to_node, node)?;
+            let child_id = insert_node(predicates, nodes, expression_to_node, node)?;
             let node = nodes[child_id].borrow_mut();
             let inode = INode {
                 parents: vec![],

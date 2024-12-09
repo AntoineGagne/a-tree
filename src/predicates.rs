@@ -3,6 +3,7 @@ use crate::{
     strings::StringId,
 };
 use rust_decimal::Decimal;
+use std::hash::{Hash, Hasher};
 
 #[derive(Eq, PartialEq, Hash, Debug, Clone)]
 pub struct Predicate {
@@ -26,6 +27,14 @@ impl Predicate {
                     kind,
                 })
             })
+    }
+
+    #[inline]
+    pub fn id(&self) -> u64 {
+        use std::hash::DefaultHasher;
+        let mut hasher = DefaultHasher::new();
+        self.hash(&mut hasher);
+        hasher.finish()
     }
 
     pub fn evaluate(&self, event: &Event) -> Option<bool> {

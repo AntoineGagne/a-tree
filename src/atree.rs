@@ -77,6 +77,7 @@ impl ATree {
                     children: vec![left_id, right_id],
                 });
                 let expression_id = rnode.id(&self.expression_to_node);
+                // FIXME: Need to update parents
                 // let node_id = self.get_or_update(&expression_id, rnode);
                 // left_node.set_parents(node_id);
                 // right_node.set_parents(node_id);
@@ -92,6 +93,7 @@ impl ATree {
                     children: vec![child_id],
                 });
                 let expression_id = rnode.id(&self.expression_to_node);
+                // FIXME: Need to update parents
                 // let node_id = self.get_or_update(&expression_id, rnode);
                 // node.set_parents(node_id);
                 // node_id
@@ -127,6 +129,7 @@ impl ATree {
                 let expression_id = inode.id(&self.expression_to_node);
                 let inode = ATreeNode::INode(inode);
                 let node_id = self.get_or_update(&expression_id, inode);
+                // FIXME: Need to update parents
                 Ok(node_id)
             }
             Node::Value(node) => {
@@ -146,6 +149,7 @@ impl ATree {
                 });
                 let expression_id = inode.id(&self.expression_to_node);
                 let node_id = self.get_or_update(&expression_id, inode);
+                // FIXME: Need to update parents
                 Ok(node_id)
             }
         }
@@ -158,7 +162,10 @@ impl ATree {
             .unwrap_or_else(|| {
                 let node_id = self.nodes.insert(node);
                 self.expression_to_node
-                    .insert_no_overwrite(*expression_id, node_id);
+                    .insert_no_overwrite(*expression_id, node_id)
+                    .unwrap_or_else(|_| {
+                        panic!("{expression_id} is already present; this is a bug")
+                    });
                 node_id
             })
     }

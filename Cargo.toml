@@ -13,11 +13,11 @@ lalrpop = "0.22.0"
 
 [dependencies]
 itertools = "0.13"
-lalrpop-util = { version = "0.21.0", features = ["lexer", "unicode"] }
-logos = "0.14"
+lalrpop-util = { version = "0.22.0", features = ["lexer", "unicode"] }
+logos = "0.15"
 rust_decimal = "1.36"
 thiserror = "1.0"
 
 [dev-dependencies]
-criterion = { version = "0.5", features = ["html_reports", "async_tokio"] }
+criterion = { version = "0.5", features = ["html_reports"] }
 proptest = "1.5"

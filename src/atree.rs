@@ -65,53 +65,63 @@ impl ATree {
 
     fn insert_root(&mut self, root: Node) -> Result<NodeId, ATreeError> {
         let is_and = matches!(&root, Node::And(_, _));
-        let rnode = match root {
+        let node_id = match root {
             Node::And(left, right) | Node::Or(left, right) => {
-                let left_id = self.insert_node(&left)?;
-                let right_id = self.insert_node(&right)?;
-                let left_node = &self.nodes[left_id];
-                let right_node = &self.nodes[right_id];
-                let rnode = RNode {
+                let left_id = self.insert_node(*left)?;
+                let right_id = self.insert_node(*right)?;
+                let (left_node, right_node) =
+                    unsafe { self.nodes.get2_unchecked_mut(left_id, right_id) };
+                let rnode = ATreeNode::RNode(RNode {
                     level: 1 + std::cmp::max(left_node.level(), right_node.level()),
                     operator: if is_and { Operator::And } else { Operator::Or },
                     children: vec![left_id, right_id],
-                };
+                });
                 let expression_id = rnode.id(&self.expression_to_node);
-                rnode
+                // let node_id = self.get_or_update(&expression_id, rnode);
+                // left_node.set_parents(node_id);
+                // right_node.set_parents(node_id);
+                // node_id
+                self.get_or_update(&expression_id, rnode)
             }
             Node::Not(child) => {
-                let child_id = self.insert_node(&child)?;
-                let node = self.nodes[child_id].borrow_mut();
-                let rnode = RNode {
+                let child_id = self.insert_node(*child)?;
+                let node = unsafe { self.nodes.get_unchecked_mut(child_id) };
+                let rnode = ATreeNode::RNode(RNode {
                     level: 1 + node.level(),
                     operator: Operator::Not,
                     children: vec![child_id],
-                };
-                rnode
+                });
+                let expression_id = rnode.id(&self.expression_to_node);
+                // let node_id = self.get_or_update(&expression_id, rnode);
+                // node.set_parents(node_id);
+                // node_id
+                self.get_or_update(&expression_id, rnode)
             }
-            Node::Value(value) => RNode::value(&value),
+            Node::Value(value) => {
+                let rnode = ATreeNode::RNode(RNode::value(&value));
+                let expression_id = rnode.id(&self.expression_to_node);
+                self.get_or_update(&expression_id, rnode)
+            }
         };
-        let rnode = ATreeNode::RNode(rnode);
-        let expression_id = rnode.id(&self.expression_to_node);
-        let node_id = self.get_or_update(&expression_id, rnode);
         Ok(node_id)
     }
 
-    fn insert_node<'atree, 'a>(&mut self, node: &'a Node) -> Result<NodeId, ATreeError<'a>> {
+    fn insert_node<'a>(&mut self, node: Node) -> Result<NodeId, ATreeError<'a>> {
+        let operator = if matches!(node, Node::And(_, _)) {
+            Operator::And
+        } else {
+            Operator::Or
+        };
         match node {
             Node::And(left, right) | Node::Or(left, right) => {
-                let left_id = self.insert_node(&*left)?;
-                let right_id = self.insert_node(&*right)?;
-                let left_node = self.nodes[left_id].borrow_mut();
-                let right_node = self.nodes[right_id].borrow_mut();
+                let left_id = self.insert_node(*left)?;
+                let right_id = self.insert_node(*right)?;
+                let (left_node, right_node) =
+                    unsafe { self.nodes.get2_unchecked_mut(left_id, right_id) };
                 let inode = INode {
                     parents: vec![],
                     level: 1 + std::cmp::max(left_node.level(), right_node.level()),
-                    operator: if matches!(node, Node::And(_, _)) {
-                        Operator::And
-                    } else {
-                        Operator::Or
-                    },
+                    operator,
                     children: vec![left_id, right_id],
                 };
                 let expression_id = inode.id(&self.expression_to_node);
@@ -125,8 +135,8 @@ impl ATree {
                 let node_id = self.get_or_update(&expression_id, lnode);
                 Ok(node_id)
             }
-            Node::Not(ref node) => {
-                let child_id = self.insert_node(node)?;
+            Node::Not(node) => {
+                let child_id = self.insert_node(*node)?;
                 let node = self.nodes[child_id].borrow_mut();
                 let inode = ATreeNode::INode(INode {
                     parents: vec![],

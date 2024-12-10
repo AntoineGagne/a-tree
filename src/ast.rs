@@ -11,7 +11,7 @@ pub enum Node {
     Value(Predicate),
 }
 
-#[derive(Hash, Clone, Eq, PartialEq)]
+#[derive(Debug, Hash, Clone, Eq, PartialEq)]
 pub enum Operator {
     And,
     Or,

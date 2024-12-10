@@ -22,12 +22,14 @@ pub struct ATree {
     nodes: Slab<ATreeNode>,
     strings: StringTable,
     attributes: AttributeTable,
+    roots: Vec<NodeId>,
     predicates: Vec<NodeId>,
     expression_to_node: BiMap<ExpressionId, NodeId>,
 }
 
 impl ATree {
     const DEFAULT_PREDICATES: usize = 200;
+    const DEFAULT_ROOTS: usize = 50;
 
     /// Create a new [`ATree`] with the specified attribute definitions.
     ///
@@ -47,6 +49,7 @@ impl ATree {
         Ok(Self {
             attributes,
             strings,
+            roots: Vec::with_capacity(Self::DEFAULT_ROOTS),
             predicates: Vec::with_capacity(Self::DEFAULT_PREDICATES),
             nodes: Slab::new(),
             expression_to_node: BiMap::new(),
@@ -61,50 +64,97 @@ impl ATree {
     }
 
     fn insert_root(&mut self, root: Node) -> Result<NodeId, ATreeError> {
-        let rnode = match &root {
+        let is_and = matches!(&root, Node::And(_, _));
+        let rnode = match root {
             Node::And(left, right) | Node::Or(left, right) => {
-                let nodes = &mut self.nodes;
-                let left_id = insert_node(
-                    &mut self.predicates,
-                    nodes,
-                    &mut self.expression_to_node,
-                    &*left,
-                )?;
-                let right_id = insert_node(
-                    &mut self.predicates,
-                    nodes,
-                    &mut self.expression_to_node,
-                    &*right,
-                )?;
-                let mut left_node = nodes[left_id].borrow_mut();
-                let mut right_node = nodes[right_id].borrow_mut();
+                let left_id = self.insert_node(&left)?;
+                let right_id = self.insert_node(&right)?;
+                let left_node = &self.nodes[left_id];
+                let right_node = &self.nodes[right_id];
                 let rnode = RNode {
                     level: 1 + std::cmp::max(left_node.level(), right_node.level()),
-                    operator: if matches!(root, Node::And(_, _)) {
-                        Operator::And
-                    } else {
-                        Operator::Or
-                    },
+                    operator: if is_and { Operator::And } else { Operator::Or },
                     children: vec![left_id, right_id],
                 };
                 let expression_id = rnode.id(&self.expression_to_node);
                 rnode
             }
             Node::Not(child) => {
-                unimplemented!();
+                let child_id = self.insert_node(&child)?;
+                let node = self.nodes[child_id].borrow_mut();
+                let rnode = RNode {
+                    level: 1 + node.level(),
+                    operator: Operator::Not,
+                    children: vec![child_id],
+                };
+                rnode
             }
-            Node::Value(value) => RNode {
-                operator: Operator::Value(value.clone()),
-                level: 1,
-                children: vec![],
-            },
+            Node::Value(value) => RNode::value(&value),
         };
         let rnode = ATreeNode::RNode(rnode);
-        Ok(1)
+        let expression_id = rnode.id(&self.expression_to_node);
+        let node_id = self.get_or_update(&expression_id, rnode);
+        Ok(node_id)
+    }
+
+    fn insert_node<'atree, 'a>(&mut self, node: &'a Node) -> Result<NodeId, ATreeError<'a>> {
+        match node {
+            Node::And(left, right) | Node::Or(left, right) => {
+                let left_id = self.insert_node(&*left)?;
+                let right_id = self.insert_node(&*right)?;
+                let left_node = self.nodes[left_id].borrow_mut();
+                let right_node = self.nodes[right_id].borrow_mut();
+                let inode = INode {
+                    parents: vec![],
+                    level: 1 + std::cmp::max(left_node.level(), right_node.level()),
+                    operator: if matches!(node, Node::And(_, _)) {
+                        Operator::And
+                    } else {
+                        Operator::Or
+                    },
+                    children: vec![left_id, right_id],
+                };
+                let expression_id = inode.id(&self.expression_to_node);
+                let inode = ATreeNode::INode(inode);
+                let node_id = self.get_or_update(&expression_id, inode);
+                Ok(node_id)
+            }
+            Node::Value(node) => {
+                let expression_id = node.id();
+                let lnode = ATreeNode::lnode(&node);
+                let node_id = self.get_or_update(&expression_id, lnode);
+                Ok(node_id)
+            }
+            Node::Not(ref node) => {
+                let child_id = self.insert_node(node)?;
+                let node = self.nodes[child_id].borrow_mut();
+                let inode = ATreeNode::INode(INode {
+                    parents: vec![],
+                    level: 1 + node.level(),
+                    operator: Operator::Not,
+                    children: vec![child_id],
+                });
+                let expression_id = inode.id(&self.expression_to_node);
+                let node_id = self.get_or_update(&expression_id, inode);
+                Ok(node_id)
+            }
+        }
+    }
+
+    fn get_or_update(&mut self, expression_id: &ExpressionId, node: ATreeNode) -> NodeId {
+        self.expression_to_node
+            .get_by_left(expression_id)
+            .cloned()
+            .unwrap_or_else(|| {
+                let node_id = self.nodes.insert(node);
+                self.expression_to_node
+                    .insert_no_overwrite(*expression_id, node_id);
+                node_id
+            })
     }
 
     /// Create a new [`EventBuilder`] to be able to generate an [`Event`] that will be usable for
-    /// finding the matching ABEs inside the [`ATree`] via the [`ATree::search()`] function.
+    /// finding the matching arbitrary boolean expressions inside the [`ATree`] via the [`ATree::search()`] function.
     ///
     /// By default, the non-assigned attributes will be undefined.
     ///
@@ -131,49 +181,7 @@ impl ATree {
     }
 }
 
-fn insert_node<'atree, 'a>(
-    predicates: &'atree mut Vec<NodeId>,
-    nodes: &'atree mut Slab<ATreeNode>,
-    expression_to_node: &'atree mut BiMap<ExpressionId, NodeId>,
-    node: &'a Node,
-) -> Result<NodeId, ATreeError<'a>> {
-    match node {
-        Node::And(left, right) | Node::Or(left, right) => {
-            unimplemented!();
-        }
-        Node::Value(node) => {
-            let expression_id = node.id();
-            let node_id = if let Some(node_id) = expression_to_node.get_by_left(&expression_id) {
-                *node_id
-            } else {
-                let lnode = ATreeNode::LNode(LNode {
-                    level: 1,
-                    parents: vec![],
-                    predicate: node.clone(),
-                });
-                let node_id = nodes.insert(lnode);
-                // TODO: Revisit this arena_id
-                expression_to_node.insert_no_overwrite(expression_id, node_id);
-                predicates.push(node_id);
-                node_id
-            };
-            Ok(node_id)
-        }
-        Node::Not(node) => {
-            let child_id = insert_node(predicates, nodes, expression_to_node, node)?;
-            let node = nodes[child_id].borrow_mut();
-            let inode = INode {
-                parents: vec![],
-                level: 1 + node.level(),
-                operator: Operator::Not,
-                children: vec![child_id],
-            };
-            let id = 1;
-            Ok(id)
-        }
-    }
-}
-
+#[derive(Debug)]
 enum ATreeNode {
     LNode(LNode),
     INode(INode),
@@ -181,12 +189,21 @@ enum ATreeNode {
 }
 
 impl ATreeNode {
+    #[inline]
     fn id(&self, expression_to_node: &BiMap<ExpressionId, NodeId>) -> u64 {
         match self {
             ATreeNode::LNode(node) => node.id(),
             ATreeNode::INode(node) => node.id(expression_to_node),
             ATreeNode::RNode(node) => node.id(expression_to_node),
         }
+    }
+
+    fn lnode(predicate: &Predicate) -> Self {
+        ATreeNode::LNode(LNode {
+            level: 1,
+            parents: vec![],
+            predicate: predicate.clone(),
+        })
     }
 
     #[inline]
@@ -197,8 +214,24 @@ impl ATreeNode {
             ATreeNode::INode(node) => node.level,
         }
     }
+
+    #[inline]
+    fn set_parents(&mut self, parent_id: NodeId) {
+        match self.borrow_mut() {
+            ATreeNode::INode(node) => {
+                node.parents.push(parent_id);
+            }
+            ATreeNode::RNode(node) => {
+                unreachable!("trying to insert parents to r-node {node:?} which cannot have any parents; this is a bug");
+            }
+            ATreeNode::LNode(node) => {
+                node.parents.push(parent_id);
+            }
+        }
+    }
 }
 
+#[derive(Debug)]
 struct LNode {
     parents: Vec<NodeId>,
     level: usize,
@@ -206,11 +239,13 @@ struct LNode {
 }
 
 impl LNode {
+    #[inline]
     fn id(&self) -> u64 {
         self.predicate.id()
     }
 }
 
+#[derive(Debug)]
 struct INode {
     parents: Vec<NodeId>,
     children: Vec<NodeId>,
@@ -250,6 +285,7 @@ impl INode {
     }
 }
 
+#[derive(Debug)]
 struct RNode {
     children: Vec<NodeId>,
     level: usize,
@@ -281,6 +317,14 @@ impl RNode {
                 !child_id
             }
             Operator::Value(predicate) => predicate.id(),
+        }
+    }
+
+    fn value(predicate: &Predicate) -> Self {
+        RNode {
+            operator: Operator::Value(predicate.clone()),
+            level: 1,
+            children: vec![],
         }
     }
 }

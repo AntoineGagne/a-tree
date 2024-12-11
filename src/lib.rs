@@ -1,5 +1,36 @@
 //! An implementation of the [A-Tree: A Dynamic Data Structure for Efficiently Indexing Arbitrary Boolean Expressions](https://dl.acm.org/doi/10.1145/3448016.3457266) paper.
 //!
+//! # Examples
+//!
+//! Searching for some boolean expressions:
+//!
+//! ```
+//! use a_tree::{ATree, AttributeDefinition};
+//!
+//! // Create the A-Tree
+//! let mut atree = ATree::new(&[
+//!     AttributeDefinition::string_list("deal_ids"),
+//!     AttributeDefinition::integer("exchange_id"),
+//!     AttributeDefinition::boolean("debug"),
+//!     AttributeDefinition::integer_list("segment_ids"),
+//! ]).unwrap();
+//!
+//! // Insert the arbitrary boolean expressions
+//! let id = atree.insert(r#"deal_ids one of ["deal-1", "deal-2"]"#).unwrap();
+//! let another_id = atree.insert(r#"segment_ids one of [1, 2, 3, 4]"#).unwrap();
+//! let third_id = atree.insert(r#"debug"#).unwrap();
+//!
+//! // Create an event
+//! let mut builder = atree.make_event();
+//! builder.with_string_list("deal_ids", &["deal-2"]).unwrap();
+//! builder.with_integer_list("segment_ids", &[1, 2]).unwrap();
+//! builder.with_boolean("debug", false).unwrap();
+//! let event = builder.build().unwrap();
+//!
+//! // Search for matching boolean expressions
+//! let report = atree.search(event);
+//! ```
+//!
 //! # Domain Specific Language (DSL)
 //!
 //! The A-Tree crate support a DSL to allow easy creation of arbitrary boolean expressions.
@@ -30,7 +61,6 @@
 //!   sub-expression `(B ∧ C)` and will make both expression refer to the common node).
 //! * Convert the strings to IDs to accelerate comparison and search;
 //! * Sort the lists and remove duplicates.
-//!
 mod ast;
 mod atree;
 mod error;

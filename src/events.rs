@@ -33,6 +33,7 @@ pub enum EventError {
 ///
 /// During the builder creation, it will set all the attributes to `undefined`. If some attributes
 /// are not assigned, they will be left `undefined`.
+#[derive(Debug)]
 pub struct EventBuilder<'atree> {
     by_ids: Vec<AttributeValue>,
     attributes: &'atree AttributeTable,
@@ -157,6 +158,7 @@ impl<'atree> EventBuilder<'atree> {
 
 /// An event that can be used by the [`crate::atree::ATree`] structure to match arbitrary boolean
 /// expressions
+#[derive(Debug)]
 pub struct Event(Vec<AttributeValue>);
 
 impl Index<AttributeId> for Event {
@@ -223,7 +225,7 @@ impl AttributeTable {
 }
 
 /// The definition of an attribute that is usable by the [`crate::atree::ATree`]
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct AttributeDefinition {
     name: String,
     kind: AttributeKind,

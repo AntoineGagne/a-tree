@@ -29,6 +29,10 @@ pub enum EventError {
     },
 }
 
+/// An [`Event`] builder
+///
+/// During the builder creation, it will set all the attributes to `undefined`. If some attributes
+/// are not assigned, they will be left `undefined`.
 pub struct EventBuilder<'atree> {
     by_ids: Vec<AttributeValue>,
     attributes: &'atree AttributeTable,
@@ -44,26 +48,54 @@ impl<'atree> EventBuilder<'atree> {
         }
     }
 
+    /// Build the corresponding [`Event`].
+    ///
+    /// By default, the non-assigned attributes will be undefined.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use a_tree::{ATree, AttributeDefinition};
+    ///
+    /// let definitions = [
+    ///     AttributeDefinition::boolean("private"),
+    ///     AttributeDefinition::integer("exchange_id"),
+    ///     AttributeDefinition::string_list("deal_ids"),
+    /// ];
+    /// let atree = ATree::new(&definitions).unwrap();
+    ///
+    /// let mut builder = atree.make_event();
+    /// builder.with_integer("exchange_id", 1).unwrap();
+    /// builder.with_boolean("private", false).unwrap();
+    ///
+    /// // The returned `Event` will have its `deal_ids` attribute `undefined` since it was not set
+    /// // by the builder
+    /// let event = builder.build().unwrap();
+    /// ```
     pub fn build(self) -> Result<Event, EventError> {
         Ok(Event(self.by_ids))
     }
 
+    /// Set the specified boolean attribute.
     pub fn with_boolean(&mut self, name: &str, value: bool) -> Result<(), EventError> {
         self.add_value(name, AttributeKind::Boolean, || {
             AttributeValue::Boolean(value)
         })
     }
 
+    /// Set the specified integer attribute.
     pub fn with_integer(&mut self, name: &str, value: i64) -> Result<(), EventError> {
         self.add_value(name, AttributeKind::Integer, || {
             AttributeValue::Integer(value)
         })
     }
 
+    /// Set the specified float attribute.
     pub fn with_float(&mut self, name: &str, value: Decimal) -> Result<(), EventError> {
         self.add_value(name, AttributeKind::Float, || AttributeValue::Float(value))
     }
 
+    /// Set the specified string attribute.
     pub fn with_string(&mut self, name: &str, value: &str) -> Result<(), EventError> {
         self.add_value(name, AttributeKind::String, || {
             let string_index = self.strings.get(value);
@@ -71,6 +103,7 @@ impl<'atree> EventBuilder<'atree> {
         })
     }
 
+    /// Set the specified list of integers attribute.
     pub fn with_integer_list(&mut self, name: &str, value: &[i64]) -> Result<(), EventError> {
         self.add_value(name, AttributeKind::IntegerList, || {
             let values = value.iter().sorted().unique().cloned().collect_vec();
@@ -78,6 +111,7 @@ impl<'atree> EventBuilder<'atree> {
         })
     }
 
+    /// Set the specified attribute to `undefined`.
     pub fn with_undefined(&mut self, name: &str) -> Result<(), EventError> {
         let index = self
             .attributes
@@ -87,6 +121,7 @@ impl<'atree> EventBuilder<'atree> {
         Ok(())
     }
 
+    /// Set the specified string list attribute.
     pub fn with_string_list(&mut self, name: &str, values: &[&str]) -> Result<(), EventError> {
         self.add_value(name, AttributeKind::StringList, || {
             let values: Vec<_> = values
@@ -120,7 +155,8 @@ impl<'atree> EventBuilder<'atree> {
     }
 }
 
-/// An event that can be used by the [`crate::atree::ATree`] structure to match ABE.
+/// An event that can be used by the [`crate::atree::ATree`] structure to match arbitrary boolean
+/// expressions
 pub struct Event(Vec<AttributeValue>);
 
 impl Index<AttributeId> for Event {
@@ -186,7 +222,7 @@ impl AttributeTable {
     }
 }
 
-/// The definition of an attribute that is usable by the [`crate::atree::ATree`].
+/// The definition of an attribute that is usable by the [`crate::atree::ATree`]
 #[derive(Clone)]
 pub struct AttributeDefinition {
     name: String,

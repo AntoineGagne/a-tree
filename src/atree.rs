@@ -17,7 +17,11 @@ use std::borrow::BorrowMut;
 type NodeId = usize;
 type ExpressionId = u64;
 
-/// The A-Tree data structure as described by the paper.
+/// The A-Tree data structure as described by the paper
+///
+/// See the [module documentation] for more details.
+///
+/// [module documentation]: index.html
 #[derive(Debug)]
 pub struct ATree {
     nodes: Slab<ATreeNode>,
@@ -35,6 +39,8 @@ impl ATree {
 
     /// Create a new [`ATree`] with the attributes that can be used by the inserted arbitrary
     /// boolean expressions along with their types.
+    ///
+    /// # Examples
     ///
     /// ```rust
     /// use a_tree::{ATree, AttributeDefinition};
@@ -73,6 +79,8 @@ impl ATree {
     }
 
     /// Insert an arbitrary boolean expression inside the [`ATree`].
+    ///
+    /// # Examples
     ///
     /// ```rust
     /// use a_tree::{ATree, AttributeDefinition};
@@ -200,23 +208,8 @@ impl ATree {
     }
 
     /// Create a new [`EventBuilder`] to be able to generate an [`Event`] that will be usable for
-    /// finding the matching arbitrary boolean expressions inside the [`ATree`] via the [`ATree::search()`] function.
-    ///
-    /// By default, the non-assigned attributes will be undefined.
-    ///
-    /// ```rust
-    /// use a_tree::{ATree, AttributeDefinition};
-    ///
-    /// let definitions = [
-    ///     AttributeDefinition::boolean("private"),
-    ///     AttributeDefinition::integer("exchange_id")
-    /// ];
-    /// let atree = ATree::new(&definitions).unwrap();
-    ///
-    /// let mut builder = atree.make_event();
-    /// assert!(builder.with_integer("exchange_id", 1).is_ok());
-    /// assert!(builder.with_boolean("private", false).is_ok());
-    /// ```
+    /// finding the matching arbitrary boolean expressions inside the [`ATree`] via the
+    /// [`ATree::search()`] function.
     pub fn make_event(&self) -> EventBuilder {
         EventBuilder::new(&self.attributes, &self.strings)
     }

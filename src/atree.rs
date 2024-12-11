@@ -24,7 +24,7 @@ type ExpressionId = u64;
 /// [module documentation]: index.html
 #[derive(Debug)]
 pub struct ATree {
-    nodes: Slab<ATreeNode>,
+    nodes: Slab<Entry>,
     strings: StringTable,
     attributes: AttributeTable,
     roots: Vec<NodeId>,
@@ -105,10 +105,10 @@ impl ATree {
             Node::And(left, right) | Node::Or(left, right) => {
                 let left_id = self.insert_node(*left)?;
                 let right_id = self.insert_node(*right)?;
-                let (left_node, right_node) =
+                let (left_entry, right_entry) =
                     unsafe { self.nodes.get2_unchecked_mut(left_id, right_id) };
                 let rnode = ATreeNode::RNode(RNode {
-                    level: 1 + std::cmp::max(left_node.level(), right_node.level()),
+                    level: 1 + std::cmp::max(left_entry.node.level(), right_entry.node.level()),
                     operator: if is_and { Operator::And } else { Operator::Or },
                     children: vec![left_id, right_id],
                 });
@@ -122,9 +122,9 @@ impl ATree {
             }
             Node::Not(child) => {
                 let child_id = self.insert_node(*child)?;
-                let node = unsafe { self.nodes.get_unchecked_mut(child_id) };
+                let entry = unsafe { self.nodes.get_unchecked_mut(child_id) };
                 let rnode = ATreeNode::RNode(RNode {
-                    level: 1 + node.level(),
+                    level: 1 + entry.node.level(),
                     operator: Operator::Not,
                     children: vec![child_id],
                 });
@@ -155,16 +155,30 @@ impl ATree {
             Node::And(left, right) | Node::Or(left, right) => {
                 let left_id = self.insert_node(*left)?;
                 let right_id = self.insert_node(*right)?;
-                let (left_node, right_node) =
+                let (left_entry, right_entry) =
                     unsafe { self.nodes.get2_unchecked_mut(left_id, right_id) };
                 let inode = INode {
                     parents: vec![],
-                    level: 1 + std::cmp::max(left_node.level(), right_node.level()),
+                    level: 1 + std::cmp::max(left_entry.node.level(), right_entry.node.level()),
                     operator,
                     children: vec![left_id, right_id],
                 };
                 let expression_id = inode.id(&self.expression_to_node);
                 let inode = ATreeNode::INode(inode);
+                let node_id = self.get_or_update(&expression_id, inode);
+                // FIXME: Need to update parents
+                Ok(node_id)
+            }
+            Node::Not(node) => {
+                let child_id = self.insert_node(*node)?;
+                let entry = self.nodes[child_id].borrow_mut();
+                let inode = ATreeNode::INode(INode {
+                    parents: vec![],
+                    level: 1 + entry.node.level(),
+                    operator: Operator::Not,
+                    children: vec![child_id],
+                });
+                let expression_id = inode.id(&self.expression_to_node);
                 let node_id = self.get_or_update(&expression_id, inode);
                 // FIXME: Need to update parents
                 Ok(node_id)
@@ -175,36 +189,22 @@ impl ATree {
                 let node_id = self.get_or_update(&expression_id, lnode);
                 Ok(node_id)
             }
-            Node::Not(node) => {
-                let child_id = self.insert_node(*node)?;
-                let node = self.nodes[child_id].borrow_mut();
-                let inode = ATreeNode::INode(INode {
-                    parents: vec![],
-                    level: 1 + node.level(),
-                    operator: Operator::Not,
-                    children: vec![child_id],
-                });
-                let expression_id = inode.id(&self.expression_to_node);
-                let node_id = self.get_or_update(&expression_id, inode);
-                // FIXME: Need to update parents
-                Ok(node_id)
-            }
         }
     }
 
     fn get_or_update(&mut self, expression_id: &ExpressionId, node: ATreeNode) -> NodeId {
-        self.expression_to_node
-            .get_by_left(expression_id)
-            .cloned()
-            .unwrap_or_else(|| {
-                let node_id = self.nodes.insert(node);
-                self.expression_to_node
-                    .insert_no_overwrite(*expression_id, node_id)
-                    .unwrap_or_else(|_| {
-                        panic!("{expression_id} is already present; this is a bug")
-                    });
-                node_id
-            })
+        if let Some(node_id) = self.expression_to_node.get_by_left(expression_id).cloned() {
+            let entry = self.nodes[node_id].borrow_mut();
+            entry.use_count += 1;
+            node_id
+        } else {
+            let entry = Entry::new(*expression_id, node);
+            let node_id = self.nodes.insert(entry);
+            self.expression_to_node
+                .insert_no_overwrite(*expression_id, node_id)
+                .unwrap_or_else(|_| panic!("{expression_id} is already present; this is a bug"));
+            node_id
+        }
     }
 
     /// Create a new [`EventBuilder`] to be able to generate an [`Event`] that will be usable for
@@ -221,6 +221,24 @@ impl ATree {
 }
 
 #[derive(Debug)]
+struct Entry {
+    id: ExpressionId,
+    node: ATreeNode,
+    use_count: usize,
+}
+
+impl Entry {
+    fn new(id: ExpressionId, node: ATreeNode) -> Self {
+        Self {
+            id,
+            node,
+            use_count: 1,
+        }
+    }
+}
+
+#[derive(Debug)]
+#[allow(clippy::enum_variant_names)]
 enum ATreeNode {
     LNode(LNode),
     INode(INode),

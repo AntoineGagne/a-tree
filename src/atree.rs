@@ -29,7 +29,8 @@ pub struct ATree {
 }
 
 impl ATree {
-    const DEFAULT_PREDICATES: usize = 200;
+    const DEFAULT_PREDICATES: usize = 1000;
+    const DEFAULT_NODES: usize = 2000;
     const DEFAULT_ROOTS: usize = 50;
 
     /// Create a new [`ATree`] with the specified attribute definitions.
@@ -52,7 +53,7 @@ impl ATree {
             strings,
             roots: Vec::with_capacity(Self::DEFAULT_ROOTS),
             predicates: Vec::with_capacity(Self::DEFAULT_PREDICATES),
-            nodes: Slab::new(),
+            nodes: Slab::with_capacity(Self::DEFAULT_NODES),
             expression_to_node: BiMap::new(),
         })
     }

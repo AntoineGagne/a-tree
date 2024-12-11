@@ -106,6 +106,7 @@ impl ATree {
                 self.get_or_update(&expression_id, rnode)
             }
         };
+        self.roots.push(node_id);
         Ok(node_id)
     }
 

@@ -1,3 +1,4 @@
+#[derive(Debug)]
 pub struct EvaluationResult {
     failed: Vec<u64>,
     success: Vec<u64>,

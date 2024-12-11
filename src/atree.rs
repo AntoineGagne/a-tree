@@ -18,6 +18,7 @@ type NodeId = usize;
 type ExpressionId = u64;
 
 /// The A-Tree data structure as described by the paper.
+#[derive(Debug)]
 pub struct ATree {
     nodes: Slab<ATreeNode>,
     strings: StringTable,
@@ -233,16 +234,16 @@ impl ATreeNode {
     }
 
     #[inline]
-    fn set_parents(&mut self, parent_id: NodeId) {
+    fn add_parent(&mut self, parent_id: NodeId) {
         match self.borrow_mut() {
             ATreeNode::INode(node) => {
                 node.parents.push(parent_id);
             }
-            ATreeNode::RNode(node) => {
-                unreachable!("trying to insert parents to r-node {node:?} which cannot have any parents; this is a bug");
-            }
             ATreeNode::LNode(node) => {
                 node.parents.push(parent_id);
+            }
+            ATreeNode::RNode(node) => {
+                unreachable!("trying to insert parents to r-node {node:?} which cannot have any parents; this is a bug");
             }
         }
     }
@@ -280,6 +281,15 @@ impl INode {
                     ))
                 });
                 if matches!(self.operator, Operator::And) {
+                    // FIXME: Even though this is what the paper says, this might easily overflows
+                    // if the numbers start to become high leading to a crash. Furthermore, there
+                    // is no collision guarantees for this. A better way might be to use a hashing
+                    // mechanism that is prefix independent
+                    //
+                    // For example, 5 * 3 is equal to 2 * 6 + 3 which means that an expression
+                    // such as (A ∧ B) and (C ∧ D ∨ E) might yield the same ID. This might be
+                    // problematic since the A-Tree is all about sharing the nodes but this might
+                    // not correct because of the collision (i.e. (A ∧ B) ≢ (C ∧ D ∨ E)).
                     children_ids.product()
                 } else {
                     children_ids.sum()
@@ -346,11 +356,13 @@ impl RNode {
     }
 }
 
+#[derive(Debug)]
 pub struct Report {
     evaluation: EvaluationResult,
 }
 
 impl Report {
+    #[inline]
     fn new(nodes: usize) -> Self {
         Self {
             evaluation: EvaluationResult::new(nodes),

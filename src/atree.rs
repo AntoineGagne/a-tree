@@ -33,7 +33,8 @@ impl ATree {
     const DEFAULT_NODES: usize = 2000;
     const DEFAULT_ROOTS: usize = 50;
 
-    /// Create a new [`ATree`] with the specified attribute definitions.
+    /// Create a new [`ATree`] with the attributes that can be used by the inserted arbitrary
+    /// boolean expressions along with their types.
     ///
     /// ```rust
     /// use a_tree::{ATree, AttributeDefinition};
@@ -44,6 +45,19 @@ impl ATree {
     /// ];
     /// let result = ATree::new(&definitions);
     /// assert!(result.is_ok());
+    /// ```
+    ///
+    /// Duplicate attributes are not allowed and the [`ATree::new()`] function will return an error if there are some:
+    ///
+    /// ```rust
+    /// use a_tree::{ATree, AttributeDefinition};
+    ///
+    /// let definitions = [
+    ///     AttributeDefinition::boolean("private"),
+    ///     AttributeDefinition::boolean("private"),
+    /// ];
+    /// let result = ATree::new(&definitions);
+    /// assert!(result.is_err());
     /// ```
     pub fn new(definitions: &[AttributeDefinition]) -> Result<Self, ATreeError> {
         let attributes = AttributeTable::new(definitions).map_err(ATreeError::Event)?;
@@ -59,7 +73,19 @@ impl ATree {
     }
 
     /// Insert an arbitrary boolean expression inside the [`ATree`].
-    pub fn insert<'a, 'tree: 'a>(&'tree mut self, abe: &'a str) -> Result<NodeId, ATreeError<'a>> {
+    ///
+    /// ```rust
+    /// use a_tree::{ATree, AttributeDefinition};
+    ///
+    /// let definitions = [
+    ///     AttributeDefinition::boolean("private"),
+    ///     AttributeDefinition::integer("exchange_id")
+    /// ];
+    /// let mut atree = ATree::new(&definitions).unwrap();
+    /// assert!(atree.insert("exchange_id = 5").is_ok());
+    /// assert!(atree.insert("private").is_ok());
+    /// ```
+    pub fn insert<'a>(&'a mut self, abe: &'a str) -> Result<NodeId, ATreeError<'a>> {
         let ast = parser::parse(abe, &self.attributes, &mut self.strings)
             .map_err(ATreeError::ParseError)?;
         self.insert_root(ast)

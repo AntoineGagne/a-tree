@@ -455,12 +455,13 @@ mod tests {
 
     const AN_INVALID_BOOLEAN_EXPRESSION: &str = "invalid in (1, 2, 3 and";
     const AN_EXPRESSION: &str = "exchange_id = 1";
+    const A_NOT_EXPRESSION: &str = "not private";
     const AN_EXPRESSION_WITH_AND_OPERATORS: &str =
         r#"exchange_id = 1 and deals one of ["deal-1", "deal-2"]"#;
     const AN_EXPRESSION_WITH_OR_OPERATORS: &str =
         r#"exchange_id = 1 and deals one of ["deal-1", "deal-2"]"#;
-    const A_COMPLEX_EXPRESSION: &str = r#"exchange_id = 1 and deal_ids one of ["deal-1", "deal-2"] and segment_ids one of [1, 2, 3] and country = 'CA' and city in ['QC'] or country = 'US' and city in ['AZ']"#;
-    const ANOTHER_COMPLEX_EXPRESSION: &str = r#"exchange_id = 1 and deal_ids one of ["deal-1", "deal-2"] and segment_ids one of [1, 2, 3] and country in ['FR', 'GB']"#;
+    const A_COMPLEX_EXPRESSION: &str = r#"exchange_id = 1 and not private and deal_ids one of ["deal-1", "deal-2"] and segment_ids one of [1, 2, 3] and country = 'CA' and city in ['QC'] or country = 'US' and city in ['AZ']"#;
+    const ANOTHER_COMPLEX_EXPRESSION: &str = r#"exchange_id = 1 and not private and deal_ids one of ["deal-1", "deal-2"] and segment_ids one of [1, 2, 3] and country in ['FR', 'GB']"#;
 
     #[test]
     fn can_build_an_atree() {
@@ -544,6 +545,22 @@ mod tests {
     }
 
     #[test]
+    fn can_insert_a_negative_expression() {
+        let definitions = [
+            AttributeDefinition::boolean("private"),
+            AttributeDefinition::string("country"),
+            AttributeDefinition::string_list("deals"),
+            AttributeDefinition::integer("exchange_id"),
+            AttributeDefinition::integer_list("segment_ids"),
+        ];
+        let mut atree = ATree::new(&definitions).unwrap();
+
+        let result = atree.insert(A_NOT_EXPRESSION);
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
     fn can_insert_an_expression_with_and_operators() {
         let definitions = [
             AttributeDefinition::boolean("private"),
@@ -578,6 +595,7 @@ mod tests {
     #[test]
     fn can_insert_an_expression_with_mixed_operators() {
         let definitions = [
+            AttributeDefinition::boolean("private"),
             AttributeDefinition::integer("exchange_id"),
             AttributeDefinition::string_list("deal_ids"),
             AttributeDefinition::integer_list("segment_ids"),
@@ -594,6 +612,7 @@ mod tests {
     #[test]
     fn can_insert_multiple_expressions_with_mixed_operators() {
         let definitions = [
+            AttributeDefinition::boolean("private"),
             AttributeDefinition::integer("exchange_id"),
             AttributeDefinition::string_list("deal_ids"),
             AttributeDefinition::integer_list("segment_ids"),
@@ -603,6 +622,6 @@ mod tests {
         let mut atree = ATree::new(&definitions).unwrap();
 
         assert!(atree.insert(A_COMPLEX_EXPRESSION).is_ok());
-        assert!(atree.insert(A_COMPLEX_EXPRESSION).is_ok());
+        assert!(atree.insert(ANOTHER_COMPLEX_EXPRESSION).is_ok());
     }
 }

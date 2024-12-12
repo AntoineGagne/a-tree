@@ -1,18 +1,14 @@
 use crate::{
-    ast::{self, *},
+    ast::*,
     error::ATreeError,
     evaluation::EvaluationResult,
-    events::{
-        AttributeDefinition, AttributeId, AttributeKind, AttributeTable, Event, EventBuilder,
-        EventError,
-    },
+    events::{AttributeDefinition, AttributeTable, Event, EventBuilder},
     parser,
     predicates::Predicate,
     strings::StringTable,
 };
 use bimap::BiMap;
 use slab::Slab;
-use std::borrow::BorrowMut;
 
 type NodeId = usize;
 type ExpressionId = u64;
@@ -105,40 +101,53 @@ impl ATree {
             Node::And(left, right) | Node::Or(left, right) => {
                 let left_id = self.insert_node(*left)?;
                 let right_id = self.insert_node(*right)?;
-                let (left_entry, right_entry) =
-                    unsafe { self.nodes.get2_unchecked_mut(left_id, right_id) };
+                let left_entry = &self.nodes[left_id];
+                let right_entry = &self.nodes[right_id];
                 let rnode = ATreeNode::RNode(RNode {
                     level: 1 + std::cmp::max(left_entry.node.level(), right_entry.node.level()),
                     operator: if is_and { Operator::And } else { Operator::Or },
                     children: vec![left_id, right_id],
                 });
                 let expression_id = rnode.id(&self.expression_to_node);
-                // FIXME: Need to update parents
-                // let node_id = self.get_or_update(&expression_id, rnode);
-                // left_node.set_parents(node_id);
-                // right_node.set_parents(node_id);
-                // node_id
-                self.get_or_update(&expression_id, rnode)
+                let node_id = get_or_update(
+                    &mut self.expression_to_node,
+                    &mut self.nodes,
+                    &expression_id,
+                    rnode,
+                );
+                add_parent(&mut self.nodes[left_id], node_id);
+                add_parent(&mut self.nodes[right_id], node_id);
+                node_id
             }
             Node::Not(child) => {
                 let child_id = self.insert_node(*child)?;
-                let entry = unsafe { self.nodes.get_unchecked_mut(child_id) };
+                let entry = &self.nodes[child_id];
                 let rnode = ATreeNode::RNode(RNode {
                     level: 1 + entry.node.level(),
                     operator: Operator::Not,
                     children: vec![child_id],
                 });
                 let expression_id = rnode.id(&self.expression_to_node);
-                // FIXME: Need to update parents
-                // let node_id = self.get_or_update(&expression_id, rnode);
-                // node.set_parents(node_id);
-                // node_id
-                self.get_or_update(&expression_id, rnode)
+                let node_id = get_or_update(
+                    &mut self.expression_to_node,
+                    &mut self.nodes,
+                    &expression_id,
+                    rnode,
+                );
+                add_parent(&mut self.nodes[child_id], node_id);
+                node_id
             }
             Node::Value(value) => {
                 let rnode = ATreeNode::RNode(RNode::value(&value));
                 let expression_id = rnode.id(&self.expression_to_node);
-                self.get_or_update(&expression_id, rnode)
+                let node_id = get_or_update(
+                    &mut self.expression_to_node,
+                    &mut self.nodes,
+                    &expression_id,
+                    rnode,
+                );
+                self.predicates.push(node_id);
+                node_id
             }
         };
         self.roots.push(node_id);
@@ -155,8 +164,8 @@ impl ATree {
             Node::And(left, right) | Node::Or(left, right) => {
                 let left_id = self.insert_node(*left)?;
                 let right_id = self.insert_node(*right)?;
-                let (left_entry, right_entry) =
-                    unsafe { self.nodes.get2_unchecked_mut(left_id, right_id) };
+                let left_entry = &self.nodes[left_id];
+                let right_entry = &self.nodes[right_id];
                 let inode = INode {
                     parents: vec![],
                     level: 1 + std::cmp::max(left_entry.node.level(), right_entry.node.level()),
@@ -165,13 +174,19 @@ impl ATree {
                 };
                 let expression_id = inode.id(&self.expression_to_node);
                 let inode = ATreeNode::INode(inode);
-                let node_id = self.get_or_update(&expression_id, inode);
-                // FIXME: Need to update parents
+                let node_id = get_or_update(
+                    &mut self.expression_to_node,
+                    &mut self.nodes,
+                    &expression_id,
+                    inode,
+                );
+                add_parent(&mut self.nodes[left_id], node_id);
+                add_parent(&mut self.nodes[right_id], node_id);
                 Ok(node_id)
             }
             Node::Not(node) => {
                 let child_id = self.insert_node(*node)?;
-                let entry = self.nodes[child_id].borrow_mut();
+                let entry = &self.nodes[child_id];
                 let inode = ATreeNode::INode(INode {
                     parents: vec![],
                     level: 1 + entry.node.level(),
@@ -179,31 +194,27 @@ impl ATree {
                     children: vec![child_id],
                 });
                 let expression_id = inode.id(&self.expression_to_node);
-                let node_id = self.get_or_update(&expression_id, inode);
-                // FIXME: Need to update parents
+                let node_id = get_or_update(
+                    &mut self.expression_to_node,
+                    &mut self.nodes,
+                    &expression_id,
+                    inode,
+                );
+                add_parent(&mut self.nodes[child_id], node_id);
                 Ok(node_id)
             }
             Node::Value(node) => {
                 let expression_id = node.id();
                 let lnode = ATreeNode::lnode(&node);
-                let node_id = self.get_or_update(&expression_id, lnode);
+                let node_id = get_or_update(
+                    &mut self.expression_to_node,
+                    &mut self.nodes,
+                    &expression_id,
+                    lnode,
+                );
+                self.predicates.push(node_id);
                 Ok(node_id)
             }
-        }
-    }
-
-    fn get_or_update(&mut self, expression_id: &ExpressionId, node: ATreeNode) -> NodeId {
-        if let Some(node_id) = self.expression_to_node.get_by_left(expression_id).cloned() {
-            let entry = self.nodes[node_id].borrow_mut();
-            entry.use_count += 1;
-            node_id
-        } else {
-            let entry = Entry::new(*expression_id, node);
-            let node_id = self.nodes.insert(entry);
-            self.expression_to_node
-                .insert_no_overwrite(*expression_id, node_id)
-                .unwrap_or_else(|_| panic!("{expression_id} is already present; this is a bug"));
-            node_id
         }
     }
 
@@ -218,6 +229,30 @@ impl ATree {
     pub fn search(&self, _event: Event) -> Result<Report, ATreeError> {
         Ok(Report::new(self.nodes.len()))
     }
+}
+
+fn get_or_update(
+    expression_to_node: &mut BiMap<ExpressionId, NodeId>,
+    nodes: &mut Slab<Entry>,
+    expression_id: &ExpressionId,
+    node: ATreeNode,
+) -> NodeId {
+    if let Some(node_id) = expression_to_node.get_by_left(expression_id).cloned() {
+        let entry = &mut nodes[node_id];
+        entry.use_count += 1;
+        node_id
+    } else {
+        let entry = Entry::new(*expression_id, node);
+        let node_id = nodes.insert(entry);
+        expression_to_node
+            .insert_no_overwrite(*expression_id, node_id)
+            .unwrap_or_else(|_| panic!("{expression_id} is already present; this is a bug"));
+        node_id
+    }
+}
+
+fn add_parent(entry: &mut Entry, node_id: NodeId) {
+    entry.node.add_parent(node_id);
 }
 
 #[derive(Debug)]
@@ -274,7 +309,7 @@ impl ATreeNode {
 
     #[inline]
     fn add_parent(&mut self, parent_id: NodeId) {
-        match self.borrow_mut() {
+        match self {
             ATreeNode::INode(node) => {
                 node.parents.push(parent_id);
             }

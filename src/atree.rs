@@ -231,6 +231,7 @@ impl ATree {
     }
 }
 
+#[inline]
 fn get_or_update(
     expression_to_node: &mut BiMap<ExpressionId, NodeId>,
     nodes: &mut Slab<Entry>,
@@ -251,6 +252,7 @@ fn get_or_update(
     }
 }
 
+#[inline]
 fn add_parent(entry: &mut Entry, node_id: NodeId) {
     entry.node.add_parent(node_id);
 }
@@ -263,6 +265,7 @@ struct Entry {
 }
 
 impl Entry {
+    #[inline]
     fn new(id: ExpressionId, node: ATreeNode) -> Self {
         Self {
             id,
@@ -290,6 +293,7 @@ impl ATreeNode {
         }
     }
 
+    #[inline]
     fn lnode(predicate: &Predicate) -> Self {
         ATreeNode::LNode(LNode {
             level: 1,
@@ -421,6 +425,7 @@ impl RNode {
         }
     }
 
+    #[inline]
     fn value(predicate: &Predicate) -> Self {
         RNode {
             operator: Operator::Value(predicate.clone()),

@@ -329,9 +329,9 @@ impl INode {
                     // such as (A ∧ B) and (C ∧ D ∨ E) might yield the same ID. This might be
                     // problematic since the A-Tree is all about sharing the nodes but this might
                     // not correct because of the collision (i.e. (A ∧ B) ≢ (C ∧ D ∨ E)).
-                    children_ids.product()
+                    children_ids.fold(1, |acc, x| acc.wrapping_mul(*x))
                 } else {
-                    children_ids.sum()
+                    children_ids.fold(0, |acc, x| acc.wrapping_add(*x))
                 }
             }
             Operator::Not => {
@@ -368,9 +368,9 @@ impl RNode {
                     ))
                 });
                 if matches!(self.operator, Operator::And) {
-                    children_ids.product()
+                    children_ids.fold(1, |acc, x| acc.wrapping_mul(*x))
                 } else {
-                    children_ids.sum()
+                    children_ids.fold(0, |acc, x| acc.wrapping_add(*x))
                 }
             }
             Operator::Not => {

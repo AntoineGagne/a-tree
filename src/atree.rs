@@ -315,15 +315,15 @@ impl INode {
         match &self.operator {
             Operator::And | Operator::Or => {
                 let children_ids = self.children.iter().map(|child| {
-                    expression_to_node.get_by_right(child).expect(&format!(
-                        "no expression ID found for child {child}; this is a bug"
-                    ))
+                    expression_to_node.get_by_right(child).unwrap_or_else(|| {
+                        panic!("no expression ID found for child {child}; this is a bug")
+                    })
                 });
                 if matches!(self.operator, Operator::And) {
-                    // FIXME: Even though this is what the paper says, this might easily overflows
-                    // if the numbers start to become high leading to a crash. Furthermore, there
-                    // is no collision guarantees for this. A better way might be to use a hashing
-                    // mechanism that is prefix independent
+                    // FIXME: Even though this is what the paper says, as per my understanding,
+                    // there is no collision guarantees for this. A better way might be to use
+                    // a hashing mechanism that is commutative to ensure that there cannot be
+                    // any collisions.
                     //
                     // For example, 5 * 3 is equal to 2 * 6 + 3 which means that an expression
                     // such as (A ∧ B) and (C ∧ D ∨ E) might yield the same ID. This might be
@@ -338,10 +338,10 @@ impl INode {
                 let child_id = self
                     .children
                     .first()
-                    .expect(&format!("no child ID for 'not' expression; this is a bug"));
+                    .unwrap_or_else(|| panic!("no child ID for 'not' expression; this is a bug"));
                 let child_id = expression_to_node
                     .get_by_right(child_id)
-                    .expect(&format!("no expression ID for child {child_id}"));
+                    .unwrap_or_else(|| panic!("no expression ID for child {child_id}"));
                 !child_id
             }
             Operator::Value(_) => {
@@ -363,9 +363,9 @@ impl RNode {
         match &self.operator {
             Operator::And | Operator::Or => {
                 let children_ids = self.children.iter().map(|child| {
-                    expression_to_node.get_by_right(child).expect(&format!(
-                        "no expression ID found for child {child} in r-node; this is a bug"
-                    ))
+                    expression_to_node.get_by_right(child).unwrap_or_else(|| {
+                        panic!("no expression ID found for child {child} in r-node; this is a bug")
+                    })
                 });
                 if matches!(self.operator, Operator::And) {
                     children_ids.fold(1, |acc, x| acc.wrapping_mul(*x))
@@ -374,12 +374,12 @@ impl RNode {
                 }
             }
             Operator::Not => {
-                let child_id = self.children.first().expect(&format!(
-                    "no child ID in r-node for 'not' expression; this is a bug"
-                ));
+                let child_id = self.children.first().unwrap_or_else(|| {
+                    panic!("no child ID in r-node for 'not' expression; this is a bug")
+                });
                 let child_id = expression_to_node
                     .get_by_right(child_id)
-                    .expect(&format!("no expression ID for child {child_id} in r-node"));
+                    .unwrap_or_else(|| panic!("no expression ID for child {child_id} in r-node"));
                 !child_id
             }
             Operator::Value(predicate) => predicate.id(),

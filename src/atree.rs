@@ -454,6 +454,13 @@ mod tests {
     use super::*;
 
     const AN_INVALID_BOOLEAN_EXPRESSION: &str = "invalid in (1, 2, 3 and";
+    const AN_EXPRESSION: &str = "exchange_id = 1";
+    const AN_EXPRESSION_WITH_AND_OPERATORS: &str =
+        r#"exchange_id = 1 and deals one of ["deal-1", "deal-2"]"#;
+    const AN_EXPRESSION_WITH_OR_OPERATORS: &str =
+        r#"exchange_id = 1 and deals one of ["deal-1", "deal-2"]"#;
+    const A_COMPLEX_EXPRESSION: &str = r#"exchange_id = 1 and deal_ids one of ["deal-1", "deal-2"] and segment_ids one of [1, 2, 3] and country = 'CA' and city in ['QC'] or country = 'US' and city in ['AZ']"#;
+    const ANOTHER_COMPLEX_EXPRESSION: &str = r#"exchange_id = 1 and deal_ids one of ["deal-1", "deal-2"] and segment_ids one of [1, 2, 3] and country in ['FR', 'GB']"#;
 
     #[test]
     fn can_build_an_atree() {
@@ -502,5 +509,100 @@ mod tests {
         let result = atree.insert(AN_INVALID_BOOLEAN_EXPRESSION);
 
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn return_an_error_on_empty_boolean_expression() {
+        let definitions = [
+            AttributeDefinition::boolean("private"),
+            AttributeDefinition::string("country"),
+            AttributeDefinition::string_list("deals"),
+            AttributeDefinition::integer("exchange_id"),
+            AttributeDefinition::integer_list("segment_ids"),
+        ];
+        let mut atree = ATree::new(&definitions).unwrap();
+
+        let result = atree.insert("");
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn can_insert_a_simple_expression() {
+        let definitions = [
+            AttributeDefinition::boolean("private"),
+            AttributeDefinition::string("country"),
+            AttributeDefinition::string_list("deals"),
+            AttributeDefinition::integer("exchange_id"),
+            AttributeDefinition::integer_list("segment_ids"),
+        ];
+        let mut atree = ATree::new(&definitions).unwrap();
+
+        let result = atree.insert(AN_EXPRESSION);
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn can_insert_an_expression_with_and_operators() {
+        let definitions = [
+            AttributeDefinition::boolean("private"),
+            AttributeDefinition::string("country"),
+            AttributeDefinition::string_list("deals"),
+            AttributeDefinition::integer("exchange_id"),
+            AttributeDefinition::integer_list("segment_ids"),
+        ];
+        let mut atree = ATree::new(&definitions).unwrap();
+
+        let result = atree.insert(AN_EXPRESSION_WITH_AND_OPERATORS);
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn can_insert_an_expression_with_or_operators() {
+        let definitions = [
+            AttributeDefinition::boolean("private"),
+            AttributeDefinition::string("country"),
+            AttributeDefinition::string_list("deals"),
+            AttributeDefinition::integer("exchange_id"),
+            AttributeDefinition::integer_list("segment_ids"),
+        ];
+        let mut atree = ATree::new(&definitions).unwrap();
+
+        let result = atree.insert(AN_EXPRESSION_WITH_OR_OPERATORS);
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn can_insert_an_expression_with_mixed_operators() {
+        let definitions = [
+            AttributeDefinition::integer("exchange_id"),
+            AttributeDefinition::string_list("deal_ids"),
+            AttributeDefinition::integer_list("segment_ids"),
+            AttributeDefinition::string("country"),
+            AttributeDefinition::string("city"),
+        ];
+        let mut atree = ATree::new(&definitions).unwrap();
+
+        let result = atree.insert(A_COMPLEX_EXPRESSION);
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn can_insert_multiple_expressions_with_mixed_operators() {
+        let definitions = [
+            AttributeDefinition::integer("exchange_id"),
+            AttributeDefinition::string_list("deal_ids"),
+            AttributeDefinition::integer_list("segment_ids"),
+            AttributeDefinition::string("country"),
+            AttributeDefinition::string("city"),
+        ];
+        let mut atree = ATree::new(&definitions).unwrap();
+
+        assert!(atree.insert(A_COMPLEX_EXPRESSION).is_ok());
+        assert!(atree.insert(A_COMPLEX_EXPRESSION).is_ok());
     }
 }

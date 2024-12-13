@@ -469,6 +469,21 @@ mod tests {
     }
 
     #[test]
+    fn can_insert_the_same_expression_multiple_times() {
+        let definitions = [
+            AttributeDefinition::boolean("private"),
+            AttributeDefinition::string("country"),
+            AttributeDefinition::string_list("deals"),
+            AttributeDefinition::integer("exchange_id"),
+            AttributeDefinition::integer_list("segment_ids"),
+        ];
+        let mut atree = ATree::new(&definitions).unwrap();
+
+        assert!(atree.insert(AN_EXPRESSION).is_ok());
+        assert!(atree.insert(AN_EXPRESSION).is_ok());
+    }
+
+    #[test]
     fn can_insert_a_negative_expression() {
         let definitions = [
             AttributeDefinition::boolean("private"),

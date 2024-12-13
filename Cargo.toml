@@ -1,8 +1,24 @@
 [package]
 name = "a-tree"
+repository = "https://github.com/AntoineGagne/a-tree"
+description = "A dynamic data structure for efficiently indexing arbitrary boolean expressions"
+authors = ["Antoine Gagné <gagnantoine@gmail.com>"]
+readme = "README.md"
 version = "0.1.0"
 edition = "2021"
 build = "build.rs"
+categories = ["data-structures"]
+keywords = [
+    "adtech",
+    "boolean-expression",
+    "boolean-logic",
+    "data-structure",
+    "data-structures",
+    "event-filtering",
+    "optimization",
+    "search",
+    "tree"
+]
 
 [[bench]]
 name = "benchmarks"

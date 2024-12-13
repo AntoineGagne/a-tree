@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+#[derive(Clone, Debug)]
 pub struct StringTable {
     by_values: HashMap<String, usize>,
     counter: usize,

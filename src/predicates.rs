@@ -3,6 +3,7 @@ use crate::{
     strings::StringId,
 };
 use rust_decimal::Decimal;
+use std::hash::{Hash, Hasher};
 
 #[derive(Eq, PartialEq, Hash, Debug, Clone)]
 pub struct Predicate {
@@ -26,6 +27,14 @@ impl Predicate {
                     kind,
                 })
             })
+    }
+
+    #[inline]
+    pub fn id(&self) -> u64 {
+        use std::hash::DefaultHasher;
+        let mut hasher = DefaultHasher::new();
+        self.hash(&mut hasher);
+        hasher.finish()
     }
 
     pub fn evaluate(&self, event: &Event) -> Option<bool> {
@@ -1076,6 +1085,7 @@ mod tests {
 
     proptest! {
         #[test]
+        #[cfg_attr(miri, ignore)]
         fn can_find_an_element_if_it_is_present_in_the_input((value, index, _) in vec_and_index()) {
             let attributes = define_attributes();
             let strings = StringTable::new();
@@ -1096,6 +1106,7 @@ mod tests {
         }
 
         #[test]
+        #[cfg_attr(miri, ignore)]
         fn can_find_an_element_common_from_both_lists((value, index, _) in vec_and_index(), (mut variable, variable_index, _) in vec_and_index()) {
             variable[variable_index] = value[index];
             let variable = variable.into_iter().sorted().unique().collect_vec();
@@ -1119,6 +1130,7 @@ mod tests {
         }
 
         #[test]
+        #[cfg_attr(miri, ignore)]
         fn can_find_a_subset_if_it_is_present_in_the_input((value, index, index_2) in vec_and_index()) {
             let attributes = define_attributes();
             let strings = StringTable::new();

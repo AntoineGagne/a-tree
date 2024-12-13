@@ -114,7 +114,7 @@ impl ATree {
                     operator: if is_and { Operator::And } else { Operator::Or },
                     children: vec![left_id, right_id],
                 });
-                let node_id = get_or_update(
+                let node_id = insert_node(
                     &mut self.expression_to_node,
                     &mut self.nodes,
                     &expression_id,
@@ -132,7 +132,7 @@ impl ATree {
                     operator: Operator::Not,
                     children: vec![child_id],
                 });
-                let node_id = get_or_update(
+                let node_id = insert_node(
                     &mut self.expression_to_node,
                     &mut self.nodes,
                     &expression_id,
@@ -143,7 +143,7 @@ impl ATree {
             }
             Node::Value(value) => {
                 let rnode = ATreeNode::RNode(RNode::value(&value));
-                let node_id = get_or_update(
+                let node_id = insert_node(
                     &mut self.expression_to_node,
                     &mut self.nodes,
                     &expression_id,
@@ -178,7 +178,7 @@ impl ATree {
                     children: vec![left_id, right_id],
                 };
                 let inode = ATreeNode::INode(inode);
-                let node_id = get_or_update(
+                let node_id = insert_node(
                     &mut self.expression_to_node,
                     &mut self.nodes,
                     &expression_id,
@@ -197,7 +197,7 @@ impl ATree {
                     operator: Operator::Not,
                     children: vec![child_id],
                 });
-                let node_id = get_or_update(
+                let node_id = insert_node(
                     &mut self.expression_to_node,
                     &mut self.nodes,
                     &expression_id,
@@ -208,7 +208,7 @@ impl ATree {
             }
             Node::Value(node) => {
                 let lnode = ATreeNode::lnode(&node);
-                let node_id = get_or_update(
+                let node_id = insert_node(
                     &mut self.expression_to_node,
                     &mut self.nodes,
                     &expression_id,
@@ -234,24 +234,18 @@ impl ATree {
 }
 
 #[inline]
-fn get_or_update(
+fn insert_node(
     expression_to_node: &mut BiMap<ExpressionId, NodeId>,
     nodes: &mut Slab<Entry>,
     expression_id: &ExpressionId,
     node: ATreeNode,
 ) -> NodeId {
-    if let Some(node_id) = expression_to_node.get_by_left(expression_id).cloned() {
-        let entry = &mut nodes[node_id];
-        entry.use_count += 1;
-        node_id
-    } else {
-        let entry = Entry::new(*expression_id, node);
-        let node_id = nodes.insert(entry);
-        expression_to_node
-            .insert_no_overwrite(*expression_id, node_id)
-            .unwrap_or_else(|_| panic!("{expression_id} is already present; this is a bug"));
-        node_id
-    }
+    let entry = Entry::new(*expression_id, node);
+    let node_id = nodes.insert(entry);
+    expression_to_node
+        .insert_no_overwrite(*expression_id, node_id)
+        .unwrap_or_else(|_| panic!("{expression_id} is already present; this is a bug"));
+    node_id
 }
 
 #[inline]

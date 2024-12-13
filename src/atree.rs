@@ -92,21 +92,21 @@ impl ATree {
     pub fn insert<'a>(&'a mut self, abe: &'a str) -> Result<NodeId, ATreeError<'a>> {
         let ast = parser::parse(abe, &self.attributes, &mut self.strings)
             .map_err(ATreeError::ParseError)?;
-        self.insert_root(ast)
+        Ok(self.insert_root(ast))
     }
 
-    fn insert_root(&mut self, root: Node) -> Result<NodeId, ATreeError> {
+    fn insert_root(&mut self, root: Node) -> NodeId {
         let expression_id = root.id();
         if let Some(node_id) = self.expression_to_node.get_by_left(&expression_id) {
             increment_use_count(*node_id, &mut self.nodes);
-            return Ok(*node_id);
+            return *node_id;
         }
 
         let is_and = matches!(&root, Node::And(_, _));
         let node_id = match root {
             Node::And(left, right) | Node::Or(left, right) => {
-                let left_id = self.insert_node(*left)?;
-                let right_id = self.insert_node(*right)?;
+                let left_id = self.insert_node(*left);
+                let right_id = self.insert_node(*right);
                 let left_entry = &self.nodes[left_id];
                 let right_entry = &self.nodes[right_id];
                 let rnode = ATreeNode::RNode(RNode {
@@ -125,7 +125,7 @@ impl ATree {
                 node_id
             }
             Node::Not(child) => {
-                let child_id = self.insert_node(*child)?;
+                let child_id = self.insert_node(*child);
                 let entry = &self.nodes[child_id];
                 let rnode = ATreeNode::RNode(RNode {
                     level: 1 + entry.node.level(),
@@ -154,21 +154,21 @@ impl ATree {
             }
         };
         self.roots.push(node_id);
-        Ok(node_id)
+        node_id
     }
 
-    fn insert_node<'a>(&mut self, node: Node) -> Result<NodeId, ATreeError<'a>> {
+    fn insert_node(&mut self, node: Node) -> NodeId {
         let expression_id = node.id();
         if let Some(node_id) = self.expression_to_node.get_by_left(&expression_id) {
             increment_use_count(*node_id, &mut self.nodes);
-            return Ok(*node_id);
+            return *node_id;
         }
 
         let is_and = matches!(node, Node::And(_, _));
         match node {
             Node::And(left, right) | Node::Or(left, right) => {
-                let left_id = self.insert_node(*left)?;
-                let right_id = self.insert_node(*right)?;
+                let left_id = self.insert_node(*left);
+                let right_id = self.insert_node(*right);
                 let left_entry = &self.nodes[left_id];
                 let right_entry = &self.nodes[right_id];
                 let inode = INode {
@@ -186,10 +186,10 @@ impl ATree {
                 );
                 add_parent(&mut self.nodes[left_id], node_id);
                 add_parent(&mut self.nodes[right_id], node_id);
-                Ok(node_id)
+                node_id
             }
             Node::Not(node) => {
-                let child_id = self.insert_node(*node)?;
+                let child_id = self.insert_node(*node);
                 let entry = &self.nodes[child_id];
                 let inode = ATreeNode::INode(INode {
                     parents: vec![],
@@ -204,7 +204,7 @@ impl ATree {
                     inode,
                 );
                 add_parent(&mut self.nodes[child_id], node_id);
-                Ok(node_id)
+                node_id
             }
             Node::Value(node) => {
                 let lnode = ATreeNode::lnode(&node);
@@ -215,7 +215,7 @@ impl ATree {
                     lnode,
                 );
                 self.predicates.push(node_id);
-                Ok(node_id)
+                node_id
             }
         }
     }

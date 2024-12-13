@@ -223,6 +223,7 @@ impl ATree {
     /// Create a new [`EventBuilder`] to be able to generate an [`Event`] that will be usable for
     /// finding the matching arbitrary boolean expressions inside the [`ATree`] via the
     /// [`ATree::search()`] function.
+    #[inline]
     pub fn make_event(&self) -> EventBuilder {
         EventBuilder::new(&self.attributes, &self.strings)
     }

@@ -98,7 +98,7 @@ impl ATree {
     fn insert_root(&mut self, root: Node) -> Result<NodeId, ATreeError> {
         let expression_id = root.id();
         if let Some(node_id) = self.expression_to_node.get_by_left(&expression_id) {
-            update_use_count(*node_id, &mut self.nodes);
+            increment_use_count(*node_id, &mut self.nodes);
             return Ok(*node_id);
         }
 
@@ -160,7 +160,7 @@ impl ATree {
     fn insert_node<'a>(&mut self, node: Node) -> Result<NodeId, ATreeError<'a>> {
         let expression_id = node.id();
         if let Some(node_id) = self.expression_to_node.get_by_left(&expression_id) {
-            update_use_count(*node_id, &mut self.nodes);
+            increment_use_count(*node_id, &mut self.nodes);
             return Ok(*node_id);
         }
 
@@ -255,7 +255,7 @@ fn add_parent(entry: &mut Entry, node_id: NodeId) {
 }
 
 #[inline]
-fn update_use_count(node_id: NodeId, nodes: &mut Slab<Entry>) {
+fn increment_use_count(node_id: NodeId, nodes: &mut Slab<Entry>) {
     nodes[node_id].use_count += 1;
 }
 

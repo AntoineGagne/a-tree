@@ -138,7 +138,7 @@ impl<'atree> EventBuilder<'atree> {
     /// Set the specified string list attribute.
     ///
     /// The specified attribute must exist within the [`crate::ATree`] and its type must be a list
-    /// of integers.
+    /// of strings.
     pub fn with_string_list(&mut self, name: &str, values: &[&str]) -> Result<(), EventError> {
         self.add_value(name, AttributeKind::StringList, || {
             let values: Vec<_> = values

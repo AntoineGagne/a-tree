@@ -78,6 +78,8 @@ impl<'atree> EventBuilder<'atree> {
     }
 
     /// Set the specified boolean attribute.
+    ///
+    /// The specified attribute must exist within the [`crate::ATree`] and its type must be boolean.
     pub fn with_boolean(&mut self, name: &str, value: bool) -> Result<(), EventError> {
         self.add_value(name, AttributeKind::Boolean, || {
             AttributeValue::Boolean(value)
@@ -85,6 +87,8 @@ impl<'atree> EventBuilder<'atree> {
     }
 
     /// Set the specified integer attribute.
+    ///
+    /// The specified attribute must exist within the [`crate::ATree`] and its type must be integer.
     pub fn with_integer(&mut self, name: &str, value: i64) -> Result<(), EventError> {
         self.add_value(name, AttributeKind::Integer, || {
             AttributeValue::Integer(value)
@@ -92,11 +96,15 @@ impl<'atree> EventBuilder<'atree> {
     }
 
     /// Set the specified float attribute.
+    ///
+    /// The specified attribute must exist within the [`crate::ATree`] and its type must be float.
     pub fn with_float(&mut self, name: &str, value: Decimal) -> Result<(), EventError> {
         self.add_value(name, AttributeKind::Float, || AttributeValue::Float(value))
     }
 
     /// Set the specified string attribute.
+    ///
+    /// The specified attribute must exist within the [`crate::ATree`] and its type must be string.
     pub fn with_string(&mut self, name: &str, value: &str) -> Result<(), EventError> {
         self.add_value(name, AttributeKind::String, || {
             let string_index = self.strings.get(value);
@@ -105,6 +113,9 @@ impl<'atree> EventBuilder<'atree> {
     }
 
     /// Set the specified list of integers attribute.
+    ///
+    /// The specified attribute must exist within the [`crate::ATree`] and its type must be a list
+    /// of integers.
     pub fn with_integer_list(&mut self, name: &str, value: &[i64]) -> Result<(), EventError> {
         self.add_value(name, AttributeKind::IntegerList, || {
             let values = value.iter().sorted().unique().cloned().collect_vec();
@@ -113,6 +124,8 @@ impl<'atree> EventBuilder<'atree> {
     }
 
     /// Set the specified attribute to `undefined`.
+    ///
+    /// The specified attribute must exist within the [`crate::ATree`].
     pub fn with_undefined(&mut self, name: &str) -> Result<(), EventError> {
         let index = self
             .attributes
@@ -123,6 +136,9 @@ impl<'atree> EventBuilder<'atree> {
     }
 
     /// Set the specified string list attribute.
+    ///
+    /// The specified attribute must exist within the [`crate::ATree`] and its type must be a list
+    /// of integers.
     pub fn with_string_list(&mut self, name: &str, values: &[&str]) -> Result<(), EventError> {
         self.add_value(name, AttributeKind::StringList, || {
             let values: Vec<_> = values

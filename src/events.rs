@@ -181,7 +181,7 @@ pub enum AttributeValue {
     Undefined,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct AttributeTable {
     by_names: HashMap<String, AttributeId>,
     by_ids: Vec<AttributeKind>,

@@ -18,3 +18,15 @@ pub enum Operator {
     Not,
     Value(Predicate),
 }
+
+impl Node {
+    #[inline]
+    pub fn id(&self) -> u64 {
+        match self {
+            Self::And(left, right) => u64::wrapping_mul(left.id(), right.id()),
+            Self::Or(left, right) => u64::wrapping_add(left.id(), right.id()),
+            Self::Not(node) => !node.id(),
+            Self::Value(node) => node.id(),
+        }
+    }
+}

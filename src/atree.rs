@@ -18,7 +18,7 @@ type ExpressionId = u64;
 /// See the [module documentation] for more details.
 ///
 /// [module documentation]: index.html
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct ATree {
     nodes: Slab<Entry>,
     strings: StringTable,
@@ -96,6 +96,12 @@ impl ATree {
     }
 
     fn insert_root(&mut self, root: Node) -> Result<NodeId, ATreeError> {
+        let expression_id = root.id();
+        if let Some(node_id) = self.expression_to_node.get_by_left(&expression_id) {
+            update_use_count(*node_id, &mut self.nodes);
+            return Ok(*node_id);
+        }
+
         let is_and = matches!(&root, Node::And(_, _));
         let node_id = match root {
             Node::And(left, right) | Node::Or(left, right) => {
@@ -108,7 +114,6 @@ impl ATree {
                     operator: if is_and { Operator::And } else { Operator::Or },
                     children: vec![left_id, right_id],
                 });
-                let expression_id = rnode.id(&self.expression_to_node);
                 let node_id = get_or_update(
                     &mut self.expression_to_node,
                     &mut self.nodes,
@@ -127,7 +132,6 @@ impl ATree {
                     operator: Operator::Not,
                     children: vec![child_id],
                 });
-                let expression_id = rnode.id(&self.expression_to_node);
                 let node_id = get_or_update(
                     &mut self.expression_to_node,
                     &mut self.nodes,
@@ -139,7 +143,6 @@ impl ATree {
             }
             Node::Value(value) => {
                 let rnode = ATreeNode::RNode(RNode::value(&value));
-                let expression_id = rnode.id(&self.expression_to_node);
                 let node_id = get_or_update(
                     &mut self.expression_to_node,
                     &mut self.nodes,
@@ -155,11 +158,13 @@ impl ATree {
     }
 
     fn insert_node<'a>(&mut self, node: Node) -> Result<NodeId, ATreeError<'a>> {
-        let operator = if matches!(node, Node::And(_, _)) {
-            Operator::And
-        } else {
-            Operator::Or
-        };
+        let expression_id = node.id();
+        if let Some(node_id) = self.expression_to_node.get_by_left(&expression_id) {
+            update_use_count(*node_id, &mut self.nodes);
+            return Ok(*node_id);
+        }
+
+        let is_and = matches!(node, Node::And(_, _));
         match node {
             Node::And(left, right) | Node::Or(left, right) => {
                 let left_id = self.insert_node(*left)?;
@@ -169,10 +174,9 @@ impl ATree {
                 let inode = INode {
                     parents: vec![],
                     level: 1 + std::cmp::max(left_entry.node.level(), right_entry.node.level()),
-                    operator,
+                    operator: if is_and { Operator::And } else { Operator::Or },
                     children: vec![left_id, right_id],
                 };
-                let expression_id = inode.id(&self.expression_to_node);
                 let inode = ATreeNode::INode(inode);
                 let node_id = get_or_update(
                     &mut self.expression_to_node,
@@ -193,7 +197,6 @@ impl ATree {
                     operator: Operator::Not,
                     children: vec![child_id],
                 });
-                let expression_id = inode.id(&self.expression_to_node);
                 let node_id = get_or_update(
                     &mut self.expression_to_node,
                     &mut self.nodes,
@@ -204,7 +207,6 @@ impl ATree {
                 Ok(node_id)
             }
             Node::Value(node) => {
-                let expression_id = node.id();
                 let lnode = ATreeNode::lnode(&node);
                 let node_id = get_or_update(
                     &mut self.expression_to_node,
@@ -257,7 +259,12 @@ fn add_parent(entry: &mut Entry, node_id: NodeId) {
     entry.node.add_parent(node_id);
 }
 
-#[derive(Debug)]
+#[inline]
+fn update_use_count(node_id: NodeId, nodes: &mut Slab<Entry>) {
+    nodes[node_id].use_count += 1;
+}
+
+#[derive(Clone, Debug)]
 struct Entry {
     id: ExpressionId,
     node: ATreeNode,
@@ -275,7 +282,7 @@ impl Entry {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 #[allow(clippy::enum_variant_names)]
 enum ATreeNode {
     LNode(LNode),
@@ -284,15 +291,6 @@ enum ATreeNode {
 }
 
 impl ATreeNode {
-    #[inline]
-    fn id(&self, expression_to_node: &BiMap<ExpressionId, NodeId>) -> u64 {
-        match self {
-            ATreeNode::LNode(node) => node.id(),
-            ATreeNode::INode(node) => node.id(expression_to_node),
-            ATreeNode::RNode(node) => node.id(expression_to_node),
-        }
-    }
-
     #[inline]
     fn lnode(predicate: &Predicate) -> Self {
         ATreeNode::LNode(LNode {
@@ -327,7 +325,7 @@ impl ATreeNode {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct LNode {
     parents: Vec<NodeId>,
     level: usize,
@@ -341,7 +339,7 @@ impl LNode {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct INode {
     parents: Vec<NodeId>,
     children: Vec<NodeId>,
@@ -349,48 +347,7 @@ struct INode {
     operator: Operator,
 }
 
-impl INode {
-    fn id(&self, expression_to_node: &BiMap<ExpressionId, NodeId>) -> u64 {
-        match &self.operator {
-            Operator::And | Operator::Or => {
-                let children_ids = self.children.iter().map(|child| {
-                    expression_to_node.get_by_right(child).unwrap_or_else(|| {
-                        panic!("no expression ID found for child {child}; this is a bug")
-                    })
-                });
-                if matches!(self.operator, Operator::And) {
-                    // FIXME: Even though this is what the paper says, as per my understanding,
-                    // there is no collision guarantees for this. A better way might be to use
-                    // a hashing mechanism that is commutative to ensure that there cannot be
-                    // any collisions.
-                    //
-                    // For example, 5 * 3 is equal to 2 * 6 + 3 which means that an expression
-                    // such as (A ∧ B) and (C ∧ D ∨ E) might yield the same ID. This might be
-                    // problematic since the A-Tree is all about sharing the nodes but this might
-                    // not correct because of the collision (i.e. (A ∧ B) ≢ (C ∧ D ∨ E)).
-                    children_ids.fold(1, |acc, x| acc.wrapping_mul(*x))
-                } else {
-                    children_ids.fold(0, |acc, x| acc.wrapping_add(*x))
-                }
-            }
-            Operator::Not => {
-                let child_id = self
-                    .children
-                    .first()
-                    .unwrap_or_else(|| panic!("no child ID for 'not' expression; this is a bug"));
-                let child_id = expression_to_node
-                    .get_by_right(child_id)
-                    .unwrap_or_else(|| panic!("no expression ID for child {child_id}"));
-                !child_id
-            }
-            Operator::Value(_) => {
-                unreachable!("i-node should not be a leaf; this is a bug");
-            }
-        }
-    }
-}
-
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct RNode {
     children: Vec<NodeId>,
     level: usize,
@@ -398,33 +355,6 @@ struct RNode {
 }
 
 impl RNode {
-    fn id(&self, expression_to_node: &BiMap<ExpressionId, NodeId>) -> u64 {
-        match &self.operator {
-            Operator::And | Operator::Or => {
-                let children_ids = self.children.iter().map(|child| {
-                    expression_to_node.get_by_right(child).unwrap_or_else(|| {
-                        panic!("no expression ID found for child {child} in r-node; this is a bug")
-                    })
-                });
-                if matches!(self.operator, Operator::And) {
-                    children_ids.fold(1, |acc, x| acc.wrapping_mul(*x))
-                } else {
-                    children_ids.fold(0, |acc, x| acc.wrapping_add(*x))
-                }
-            }
-            Operator::Not => {
-                let child_id = self.children.first().unwrap_or_else(|| {
-                    panic!("no child ID in r-node for 'not' expression; this is a bug")
-                });
-                let child_id = expression_to_node
-                    .get_by_right(child_id)
-                    .unwrap_or_else(|| panic!("no expression ID for child {child_id} in r-node"));
-                !child_id
-            }
-            Operator::Value(predicate) => predicate.id(),
-        }
-    }
-
     #[inline]
     fn value(predicate: &Predicate) -> Self {
         RNode {

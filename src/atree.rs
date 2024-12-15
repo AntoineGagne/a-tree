@@ -250,6 +250,10 @@ impl ATree {
 
         for current in 0..queues.len() {
             while let Some((node_id, node)) = queues[current].pop() {
+                if results.is_evaluated(node_id) {
+                    continue;
+                }
+
                 let result = evaluate_node(node_id, node, &mut results);
 
                 if result.is_none() {
@@ -342,10 +346,6 @@ fn evaluate_predicates<'a>(
 
 #[inline]
 fn evaluate_node(node_id: NodeId, node: &Entry, results: &mut EvaluationResult) -> Option<bool> {
-    if results.is_evaluated(node_id) {
-        return results.get_result(node_id);
-    }
-
     let operator = node.operator();
     let result = match operator {
         Operator::And => node.children().iter().try_fold(true, |acc, child_id| {
@@ -569,8 +569,6 @@ pub struct Report {
 }
 
 impl Report {
-    const DEFAULT_MATCHES: usize = 50;
-
     fn new(matches: Vec<NodeId>) -> Self {
         Self { matches }
     }
@@ -591,7 +589,7 @@ mod tests {
     const AN_EXPRESSION_WITH_AND_OPERATORS: &str =
         r#"exchange_id = 1 and deals one of ["deal-1", "deal-2"]"#;
     const AN_EXPRESSION_WITH_OR_OPERATORS: &str =
-        r#"exchange_id = 1 and deals one of ["deal-1", "deal-2"]"#;
+        r#"exchange_id = 1 or deals one of ["deal-1", "deal-2"]"#;
     const A_COMPLEX_EXPRESSION: &str = r#"exchange_id = 1 and not private and deal_ids one of ["deal-1", "deal-2"] and segment_ids one of [1, 2, 3] and country = 'CA' and city in ['QC'] or country = 'US' and city in ['AZ']"#;
     const ANOTHER_COMPLEX_EXPRESSION: &str = r#"exchange_id = 1 and not private and deal_ids one of ["deal-1", "deal-2"] and segment_ids one of [1, 2, 3] and country in ['FR', 'GB']"#;
 
@@ -770,5 +768,41 @@ mod tests {
 
         assert!(atree.insert(A_COMPLEX_EXPRESSION).is_ok());
         assert!(atree.insert(ANOTHER_COMPLEX_EXPRESSION).is_ok());
+    }
+
+    #[test]
+    fn can_search_inside_the_tree() {
+        let definitions = [
+            AttributeDefinition::boolean("private"),
+            AttributeDefinition::integer("exchange_id"),
+            AttributeDefinition::string_list("deal_ids"),
+            AttributeDefinition::string_list("deals"),
+            AttributeDefinition::integer_list("segment_ids"),
+            AttributeDefinition::string("country"),
+            AttributeDefinition::string("city"),
+        ];
+        let mut atree = ATree::new(&definitions).unwrap();
+
+        let _ = atree.insert(A_COMPLEX_EXPRESSION).unwrap();
+        let id = atree.insert(AN_EXPRESSION_WITH_AND_OPERATORS).unwrap();
+        let another_id = atree.insert(AN_EXPRESSION_WITH_OR_OPERATORS).unwrap();
+        let mut builder = atree.make_event();
+        builder.with_integer("exchange_id", 1).unwrap();
+        builder.with_boolean("private", true).unwrap();
+        builder
+            .with_string_list("deal_ids", &["deal-1", "deal-2"])
+            .unwrap();
+        builder
+            .with_string_list("deals", &["deal-1", "deal-2"])
+            .unwrap();
+        builder.with_integer_list("segment_ids", &[2, 3]).unwrap();
+        builder.with_string("country", "FR").unwrap();
+        let event = builder.build().unwrap();
+
+        let mut expected = vec![id, another_id];
+        let mut actual = atree.search(event).unwrap().matches().to_vec();
+        expected.sort();
+        actual.sort();
+        assert_eq!(expected, actual);
     }
 }

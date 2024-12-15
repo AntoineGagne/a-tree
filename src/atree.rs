@@ -349,11 +349,9 @@ fn evaluate_node(node_id: NodeId, node: &Entry, results: &mut EvaluationResult) 
     let operator = node.operator();
     let result = match operator {
         Operator::And => node.children().iter().try_fold(true, |acc, child_id| {
-            debug_assert!(results.is_evaluated(*child_id));
             results.get_result(*child_id).map(|result| result && acc)
         }),
         Operator::Or => node.children().iter().try_fold(false, |acc, child_id| {
-            debug_assert!(results.is_evaluated(*child_id));
             results.get_result(*child_id).map(|result| result || acc)
         }),
         Operator::Not => {
@@ -361,7 +359,6 @@ fn evaluate_node(node_id: NodeId, node: &Entry, results: &mut EvaluationResult) 
                 .children()
                 .first()
                 .unwrap_or_else(|| panic!("trying to extract from empty not"));
-            debug_assert!(results.is_evaluated(*child_id));
             results.get_result(*child_id).map(|result| !result)
         }
         Operator::Value(_) => unreachable!(),

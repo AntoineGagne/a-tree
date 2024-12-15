@@ -24,6 +24,7 @@ pub struct ATree {
     strings: StringTable,
     attributes: AttributeTable,
     roots: Vec<NodeId>,
+    max_level: usize,
     predicates: Vec<NodeId>,
     expression_to_node: BiMap<ExpressionId, NodeId>,
 }
@@ -67,6 +68,7 @@ impl ATree {
         Ok(Self {
             attributes,
             strings,
+            max_level: 1,
             roots: Vec::with_capacity(Self::DEFAULT_ROOTS),
             predicates: Vec::with_capacity(Self::DEFAULT_PREDICATES),
             nodes: Slab::with_capacity(Self::DEFAULT_NODES),
@@ -154,6 +156,7 @@ impl ATree {
             }
         };
         self.roots.push(node_id);
+        self.max_level = get_max_level(&self.roots, &self.nodes);
         node_id
     }
 
@@ -229,8 +232,52 @@ impl ATree {
     }
 
     /// Search the [`ATree`] for arbitrary boolean expressions that match the [`Event`].
-    pub fn search(&self, _event: Event) -> Result<Report, ATreeError> {
-        Ok(Report::new(self.nodes.len()))
+    pub fn search(&self, event: Event) -> Result<Report, ATreeError> {
+        let mut results = EvaluationResult::new(self.nodes.len());
+        let mut matches = Vec::<NodeId>::with_capacity(50);
+
+        // Since the predicates will already be evaluated and their parents will be put into the
+        // queues, then there is no need to keep a queue for them.
+        let mut queues = vec![Vec::with_capacity(50); self.max_level - 1];
+        evaluate_predicates(
+            &self.predicates,
+            &self.nodes,
+            &event,
+            &mut matches,
+            &mut results,
+            &mut queues,
+        );
+
+        for current in 0..queues.len() {
+            while let Some((node_id, node)) = queues[current].pop() {
+                if results.is_evaluated(node_id) {
+                    continue;
+                }
+
+                let result = evaluate_node(node_id, node, &mut results);
+
+                if result.is_none() {
+                    continue;
+                }
+
+                let entry = &self.nodes[node_id];
+                if entry.is_root() {
+                    if let Some(true) = result {
+                        matches.push(node_id);
+                    }
+                    continue;
+                }
+
+                for parent_id in entry.parents() {
+                    if !results.is_evaluated(*parent_id) {
+                        let entry = &self.nodes[*parent_id];
+                        queues[entry.level() - 2].push((*parent_id, entry));
+                    }
+                }
+            }
+        }
+
+        Ok(Report::new(matches))
     }
 }
 
@@ -259,6 +306,67 @@ fn increment_use_count(node_id: NodeId, nodes: &mut Slab<Entry>) {
     nodes[node_id].use_count += 1;
 }
 
+#[inline]
+fn get_max_level(roots: &[NodeId], nodes: &Slab<Entry>) -> usize {
+    roots
+        .iter()
+        .map(|root_id| nodes[*root_id].level())
+        .max()
+        .unwrap_or(1)
+}
+
+#[inline]
+fn evaluate_predicates<'a>(
+    predicates: &[NodeId],
+    nodes: &'a Slab<Entry>,
+    event: &Event,
+    matches: &mut Vec<NodeId>,
+    results: &mut EvaluationResult,
+    queues: &mut [Vec<(NodeId, &'a Entry)>],
+) {
+    for predicate_id in predicates {
+        let node = &nodes[*predicate_id];
+        let result = node.evaluate(event);
+        results.set_result(*predicate_id, result);
+
+        if node.is_root() {
+            if let Some(true) = result {
+                matches.push(*predicate_id);
+            }
+        } else {
+            node.parents()
+                .iter()
+                .map(|parent_id| (*parent_id, &nodes[*parent_id]))
+                .for_each(|(parent_id, parent)| {
+                    queues[parent.level() - 2].push((parent_id, parent));
+                })
+        }
+    }
+}
+
+#[inline]
+fn evaluate_node(node_id: NodeId, node: &Entry, results: &mut EvaluationResult) -> Option<bool> {
+    let operator = node.operator();
+    let result = match operator {
+        Operator::And => node.children().iter().try_fold(true, |acc, child_id| {
+            results.get_result(*child_id).map(|result| result && acc)
+        }),
+        Operator::Or => node.children().iter().try_fold(false, |acc, child_id| {
+            results.get_result(*child_id).map(|result| result || acc)
+        }),
+        Operator::Not => {
+            let child_id = node
+                .children()
+                .first()
+                .unwrap_or_else(|| panic!("trying to extract from empty not"));
+            results.get_result(*child_id).map(|result| !result)
+        }
+        Operator::Value(_) => unreachable!(),
+    };
+    results.set_result(node_id, result);
+    result
+}
+
 #[derive(Clone, Debug)]
 struct Entry {
     id: ExpressionId,
@@ -267,13 +375,47 @@ struct Entry {
 }
 
 impl Entry {
-    #[inline]
     fn new(id: ExpressionId, node: ATreeNode) -> Self {
         Self {
             id,
             node,
             use_count: 1,
         }
+    }
+
+    #[inline]
+    const fn level(&self) -> usize {
+        self.node.level()
+    }
+
+    #[inline]
+    fn evaluate(&self, event: &Event) -> Option<bool> {
+        self.node.evaluate(event)
+    }
+
+    #[inline]
+    const fn is_root(&self) -> bool {
+        self.node.is_root()
+    }
+
+    #[inline]
+    const fn is_predicate(&self) -> bool {
+        self.node.is_predicate()
+    }
+
+    #[inline]
+    fn operator(&self) -> Operator {
+        self.node.operator()
+    }
+
+    #[inline]
+    fn children(&self) -> &[NodeId] {
+        self.node.children()
+    }
+
+    #[inline]
+    fn parents(&self) -> &[NodeId] {
+        self.node.parents()
     }
 }
 
@@ -288,7 +430,7 @@ enum ATreeNode {
 impl ATreeNode {
     #[inline]
     fn lnode(predicate: &Predicate) -> Self {
-        ATreeNode::LNode(LNode {
+        Self::LNode(LNode {
             level: 1,
             parents: vec![],
             predicate: predicate.clone(),
@@ -298,9 +440,70 @@ impl ATreeNode {
     #[inline]
     const fn level(&self) -> usize {
         match self {
-            ATreeNode::RNode(node) => node.level,
-            ATreeNode::LNode(node) => node.level,
-            ATreeNode::INode(node) => node.level,
+            Self::RNode(node) => node.level,
+            Self::LNode(node) => node.level,
+            Self::INode(node) => node.level,
+        }
+    }
+
+    #[inline]
+    fn evaluate(&self, event: &Event) -> Option<bool> {
+        match self {
+            Self::LNode(node) => node.predicate.evaluate(event),
+            Self::RNode(RNode {
+                operator: Operator::Value(predicate),
+                ..
+            }) => predicate.evaluate(event),
+            node => unreachable!("evaluating {node:?} which is not a predicate; this is a bug."),
+        }
+    }
+
+    #[inline]
+    const fn is_root(&self) -> bool {
+        matches!(self, Self::RNode(_))
+    }
+
+    #[inline]
+    const fn is_predicate(&self) -> bool {
+        matches!(
+            self,
+            Self::LNode(_)
+                | Self::RNode(RNode {
+                    operator: Operator::Value(_),
+                    ..
+                })
+        )
+    }
+
+    #[inline]
+    fn operator(&self) -> Operator {
+        match self {
+            Self::RNode(RNode {
+                operator: Operator::Value(_),
+                ..
+            })
+            | Self::LNode(_) => {
+                unreachable!("trying to get the operator of leaf node; this is a bug");
+            }
+            Self::RNode(RNode { operator, .. }) | Self::INode(INode { operator, .. }) => {
+                operator.clone()
+            }
+        }
+    }
+
+    #[inline]
+    fn children(&self) -> &[NodeId] {
+        match self {
+            Self::INode(INode { children, .. }) | Self::RNode(RNode { children, .. }) => children,
+            Self::LNode(_) => unreachable!("cannot get children for l-node; this is a bug"),
+        }
+    }
+
+    #[inline]
+    fn parents(&self) -> &[NodeId] {
+        match self {
+            Self::INode(INode { parents, .. }) | Self::LNode(LNode { parents, .. }) => parents,
+            Self::RNode(_) => unreachable!("cannot get children for r-node; this is a bug"),
         }
     }
 
@@ -362,15 +565,17 @@ impl RNode {
 
 #[derive(Debug)]
 pub struct Report {
-    evaluation: EvaluationResult,
+    matches: Vec<usize>,
 }
 
 impl Report {
+    fn new(matches: Vec<NodeId>) -> Self {
+        Self { matches }
+    }
+
     #[inline]
-    fn new(nodes: usize) -> Self {
-        Self {
-            evaluation: EvaluationResult::new(nodes),
-        }
+    pub fn matches(&self) -> &[NodeId] {
+        &self.matches
     }
 }
 
@@ -384,7 +589,7 @@ mod tests {
     const AN_EXPRESSION_WITH_AND_OPERATORS: &str =
         r#"exchange_id = 1 and deals one of ["deal-1", "deal-2"]"#;
     const AN_EXPRESSION_WITH_OR_OPERATORS: &str =
-        r#"exchange_id = 1 and deals one of ["deal-1", "deal-2"]"#;
+        r#"exchange_id = 1 or deals one of ["deal-1", "deal-2"]"#;
     const A_COMPLEX_EXPRESSION: &str = r#"exchange_id = 1 and not private and deal_ids one of ["deal-1", "deal-2"] and segment_ids one of [1, 2, 3] and country = 'CA' and city in ['QC'] or country = 'US' and city in ['AZ']"#;
     const ANOTHER_COMPLEX_EXPRESSION: &str = r#"exchange_id = 1 and not private and deal_ids one of ["deal-1", "deal-2"] and segment_ids one of [1, 2, 3] and country in ['FR', 'GB']"#;
 
@@ -563,5 +768,41 @@ mod tests {
 
         assert!(atree.insert(A_COMPLEX_EXPRESSION).is_ok());
         assert!(atree.insert(ANOTHER_COMPLEX_EXPRESSION).is_ok());
+    }
+
+    #[test]
+    fn can_search_inside_the_tree() {
+        let definitions = [
+            AttributeDefinition::boolean("private"),
+            AttributeDefinition::integer("exchange_id"),
+            AttributeDefinition::string_list("deal_ids"),
+            AttributeDefinition::string_list("deals"),
+            AttributeDefinition::integer_list("segment_ids"),
+            AttributeDefinition::string("country"),
+            AttributeDefinition::string("city"),
+        ];
+        let mut atree = ATree::new(&definitions).unwrap();
+
+        let _ = atree.insert(A_COMPLEX_EXPRESSION).unwrap();
+        let id = atree.insert(AN_EXPRESSION_WITH_AND_OPERATORS).unwrap();
+        let another_id = atree.insert(AN_EXPRESSION_WITH_OR_OPERATORS).unwrap();
+        let mut builder = atree.make_event();
+        builder.with_integer("exchange_id", 1).unwrap();
+        builder.with_boolean("private", true).unwrap();
+        builder
+            .with_string_list("deal_ids", &["deal-1", "deal-2"])
+            .unwrap();
+        builder
+            .with_string_list("deals", &["deal-1", "deal-2"])
+            .unwrap();
+        builder.with_integer_list("segment_ids", &[2, 3]).unwrap();
+        builder.with_string("country", "FR").unwrap();
+        let event = builder.build().unwrap();
+
+        let mut expected = vec![id, another_id];
+        let mut actual = atree.search(event).unwrap().matches().to_vec();
+        expected.sort();
+        actual.sort();
+        assert_eq!(expected, actual);
     }
 }

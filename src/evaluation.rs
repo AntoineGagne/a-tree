@@ -9,7 +9,7 @@ impl EvaluationResult {
     const EXPRESSIONS_PER_BUCKET: usize = 64;
 
     pub fn new(expressions: usize) -> Self {
-        let size = expressions / Self::EXPRESSIONS_PER_BUCKET;
+        let size = expressions / Self::EXPRESSIONS_PER_BUCKET + 1;
         Self {
             failed: vec![0; size],
             success: vec![0; size],
@@ -67,9 +67,20 @@ impl EvaluationResult {
 mod tests {
     use super::*;
 
+    const SIZE_LESS_THAN_64: usize = 15;
     const SIZE: usize = 128;
     const AN_ID: usize = 1;
     const AN_ID_THAT_EXCEEDS_U64: usize = 67;
+
+    #[test]
+    fn can_create_with_a_size_that_is_less_than_64() {
+        let mut results = EvaluationResult::new(SIZE_LESS_THAN_64);
+
+        results.set_result(AN_ID, Some(false));
+
+        assert!(results.is_evaluated(AN_ID));
+        assert_eq!(Some(false), results.get_result(AN_ID));
+    }
 
     #[test]
     fn when_looking_if_unevaluated_result_is_evaluated_then_return_false() {

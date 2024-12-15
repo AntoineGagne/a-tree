@@ -6,6 +6,7 @@
 //!
 //! ```
 //! use a_tree::{ATree, AttributeDefinition};
+//! use std::collections::HashMap;
 //!
 //! // Create the A-Tree
 //! let mut atree = ATree::new(&[
@@ -16,9 +17,11 @@
 //! ]).unwrap();
 //!
 //! // Insert the arbitrary boolean expressions
-//! let id = atree.insert(r#"deal_ids one of ["deal-1", "deal-2"]"#).unwrap();
-//! let another_id = atree.insert(r#"segment_ids one of [1, 2, 3, 4]"#).unwrap();
-//! let third_id = atree.insert(r#"debug"#).unwrap();
+//! let mut mappings = HashMap::new();
+//! for expression in &[r#"deal_ids one of ["deal-1", "deal-2"]"#, r#"segment_ids one of [1, 2, 3, 4]"#, r#"debug"#] {
+//!     let id = atree.insert(expression).unwrap();
+//!     mappings.insert(id, expression);
+//! }
 //!
 //! // Create an event
 //! let mut builder = atree.make_event();
@@ -28,7 +31,10 @@
 //! let event = builder.build().unwrap();
 //!
 //! // Search for matching boolean expressions
-//! let report = atree.search(event);
+//! let report = atree.search(event).unwrap();
+//! report.matches().iter().for_each(|id| {
+//!     println!(r#"Found ID: {id}, Expression: "{}""#, mappings[id]);
+//! });
 //! ```
 //!
 //! # Domain Specific Language (DSL)

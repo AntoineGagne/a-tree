@@ -1,4 +1,9 @@
 use a_tree::{ATree, AttributeDefinition};
+use std::collections::HashMap;
+
+const FIRST_EXPRESSION: &str = r#"exchange_id = 1 and deal_ids one of ['deal-1', 'deal-2'] and segment_ids one of [1, 2, 3] and country in ['FR', 'GB']"#;
+const SECOND_EXPRESSION: &str = r#"exchange_id = 1 and deal_ids one of ['deal-1', 'deal-2'] and segment_ids one of [1, 2, 3] and country = 'CA' and city in ['QC'] or country = 'US' and city in ['AZ']"#;
+const THIRD_EXPRESSION: &str = r#"exchange_id = 1 and deal_ids one of ['deal-1', 'deal-2'] and segment_ids one of [1, 2, 3] and country = 'CA' and city in ['QC'] or country = 'US'"#;
 
 fn main() {
     // Create the A-Tree
@@ -12,10 +17,11 @@ fn main() {
     let mut atree = ATree::new(&attributes).unwrap();
 
     // Insert the arbitrary boolean expressions
-    let id = atree
-        .insert(r#"exchange_id = 1 and deal_ids one of ["deal-1", "deal-2"] and segment_ids one of [1, 2, 3] and country in ['FR', 'GB']"#)
-        .unwrap();
-    let other_id = atree.insert(r#"exchange_id = 1 and deal_ids one of ["deal-1", "deal-2"] and segment_ids one of [1, 2, 3] and country = 'CA' and city in ['QC'] or country = 'US' and city in ['AZ']"#).unwrap();
+    let mut mappings = HashMap::new();
+    for expression in &[FIRST_EXPRESSION, SECOND_EXPRESSION, THIRD_EXPRESSION] {
+        let id = atree.insert(expression).unwrap();
+        mappings.insert(id, expression);
+    }
 
     // Create the matching event
     let mut builder = atree.make_event();
@@ -30,5 +36,9 @@ fn main() {
     builder.with_string("city", "AZ").unwrap();
     let event = builder.build().unwrap();
 
+    // Search inside the A-Tree for matching events
     let report = atree.search(event).unwrap();
+    report.matches().iter().for_each(|id| {
+        println!(r#"Found ID: {id}, Expression: "{}""#, mappings[id]);
+    });
 }

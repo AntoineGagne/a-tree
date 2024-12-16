@@ -35,7 +35,7 @@ pub fn search(c: &mut Criterion) {
     ];
     let mut atree = ATree::new(&attributes).unwrap();
     atree.insert(AN_ID, AN_EXPRESSION).unwrap();
-    c.bench_function("insert", |b| {
+    c.bench_function("search", |b| {
         b.iter_batched(
             || {
                 let mut builder = atree.make_event();

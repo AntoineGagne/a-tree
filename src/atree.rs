@@ -148,12 +148,12 @@ impl<T> ATree<T> {
                 node_id
             }
             Node::Value(value) => {
-                let rnode = ATreeNode::RNode(RNode::value(&value));
+                let lnode = ATreeNode::lnode(&value);
                 let node_id = insert_node(
                     &mut self.expression_to_node,
                     &mut self.nodes,
                     &expression_id,
-                    rnode,
+                    lnode,
                     Some(user_id),
                 );
                 self.predicates.push(node_id);
@@ -168,7 +168,6 @@ impl<T> ATree<T> {
         let expression_id = node.id();
         if let Some(node_id) = self.expression_to_node.get_by_left(&expression_id) {
             increment_use_count(*node_id, &mut self.nodes);
-            from_rnode_to_lnode(*node_id, &mut self.nodes);
             return *node_id;
         }
 
@@ -370,14 +369,12 @@ fn evaluate_predicates<'a, T>(
             }
         }
 
-        if !node.is_root() {
-            node.parents()
-                .iter()
-                .map(|parent_id| (*parent_id, &nodes[*parent_id]))
-                .for_each(|(parent_id, parent)| {
-                    queues[parent.level() - 2].push((parent_id, parent));
-                })
-        }
+        node.parents()
+            .iter()
+            .map(|parent_id| (*parent_id, &nodes[*parent_id]))
+            .for_each(|(parent_id, parent)| {
+                queues[parent.level() - 2].push((parent_id, parent));
+            })
     }
 }
 
@@ -614,17 +611,6 @@ struct RNode {
     children: Vec<NodeId>,
     level: usize,
     operator: Operator,
-}
-
-impl RNode {
-    #[inline]
-    fn value(predicate: &Predicate) -> Self {
-        RNode {
-            operator: Operator::Value(predicate.clone()),
-            level: 1,
-            children: vec![],
-        }
-    }
 }
 
 #[derive(Debug)]

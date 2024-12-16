@@ -677,7 +677,7 @@ mod tests {
         let attributes = define_attributes();
         let strings = StringTable::new();
         let mut builder = an_event_builder(&attributes, &strings);
-        builder.with_float("bidfloor", Decimal::new(55, 3)).unwrap();
+        builder.with_float("bidfloor", 55, 3).unwrap();
         let event = builder.build().unwrap();
 
         let predicate = Predicate::new(
@@ -699,7 +699,7 @@ mod tests {
         let attributes = define_attributes();
         let strings = StringTable::new();
         let mut builder = an_event_builder(&attributes, &strings);
-        builder.with_float("bidfloor", Decimal::new(55, 3)).unwrap();
+        builder.with_float("bidfloor", 55, 3).unwrap();
         let event = builder.build().unwrap();
 
         let predicate = Predicate::new(
@@ -720,7 +720,7 @@ mod tests {
         let attributes = define_attributes();
         let strings = StringTable::new();
         let mut builder = an_event_builder(&attributes, &strings);
-        builder.with_float("bidfloor", Decimal::new(55, 3)).unwrap();
+        builder.with_float("bidfloor", 55, 3).unwrap();
         let event = builder.build().unwrap();
 
         let predicate = Predicate::new(
@@ -741,7 +741,7 @@ mod tests {
         let attributes = define_attributes();
         let strings = StringTable::new();
         let mut builder = an_event_builder(&attributes, &strings);
-        builder.with_float("bidfloor", Decimal::new(55, 3)).unwrap();
+        builder.with_float("bidfloor", 55, 3).unwrap();
         let event = builder.build().unwrap();
 
         let predicate = Predicate::new(
@@ -1174,7 +1174,7 @@ mod tests {
         assert!(builder
             .with_string_list("deals", &["deal-1", "deal-2"])
             .is_ok());
-        assert!(builder.with_float("bidfloor", Decimal::new(1, 0)).is_ok());
+        assert!(builder.with_float("bidfloor", 1, 0).is_ok());
         assert!(builder.with_integer("exchange_id", AN_EXCHANGE_ID).is_ok());
         assert!(builder.with_boolean("private", true).is_ok());
         assert!(builder.with_integer_list("segment_ids", &[1, 2, 3]).is_ok());

@@ -98,8 +98,10 @@ impl<'atree> EventBuilder<'atree> {
     /// Set the specified float attribute.
     ///
     /// The specified attribute must exist within the [`crate::ATree`] and its type must be float.
-    pub fn with_float(&mut self, name: &str, value: Decimal) -> Result<(), EventError> {
-        self.add_value(name, AttributeKind::Float, || AttributeValue::Float(value))
+    pub fn with_float(&mut self, name: &str, number: i64, scale: u32) -> Result<(), EventError> {
+        self.add_value(name, AttributeKind::Float, || {
+            AttributeValue::Float(Decimal::new(number, scale))
+        })
     }
 
     /// Set the specified string attribute.
@@ -380,7 +382,7 @@ mod tests {
         let strings = StringTable::new();
         let mut event_builder = EventBuilder::new(&attributes, &strings);
 
-        let result = event_builder.with_float("bidfloor", Decimal::new(1, 0));
+        let result = event_builder.with_float("bidfloor", 1, 0);
 
         assert!(result.is_ok());
     }
@@ -460,7 +462,7 @@ mod tests {
             .with_string_list("deals", &["deal-1", "deal-2"])
             .is_ok());
         assert!(builder.with_integer("exchange_id", 1).is_ok());
-        assert!(builder.with_float("bidfloor", Decimal::new(1, 0)).is_ok());
+        assert!(builder.with_float("bidfloor", 1, 0).is_ok());
         assert!(builder.with_string("country", "US").is_ok());
         assert!(builder.with_integer_list("segment_ids", &[1, 2, 3]).is_ok());
 

@@ -368,7 +368,9 @@ fn evaluate_predicates<'a, T>(
                     matches.push(user_id);
                 }
             }
-        } else {
+        }
+
+        if !node.is_root() {
             node.parents()
                 .iter()
                 .map(|parent_id| (*parent_id, &nodes[*parent_id]))
@@ -387,12 +389,8 @@ fn evaluate_node<T>(
 ) -> Option<bool> {
     let operator = node.operator();
     let result = match operator {
-        Operator::And => node.children().iter().try_fold(true, |acc, child_id| {
-            results.get_result(*child_id).map(|result| result && acc)
-        }),
-        Operator::Or => node.children().iter().try_fold(false, |acc, child_id| {
-            results.get_result(*child_id).map(|result| result || acc)
-        }),
+        Operator::And => evaluate_and(node.children(), results),
+        Operator::Or => evaluate_or(node.children(), results),
         Operator::Not => {
             let child_id = node
                 .children()
@@ -404,6 +402,55 @@ fn evaluate_node<T>(
     };
     results.set_result(node_id, result);
     result
+}
+
+#[inline]
+fn evaluate_and(children: &[NodeId], results: &EvaluationResult) -> Option<bool> {
+    let mut acc = Some(true);
+    for child_id in children {
+        match (acc, results.get_result(*child_id)) {
+            (Some(false), _) => {
+                acc = Some(false);
+                break;
+            }
+            (_, Some(false)) => {
+                acc = Some(false);
+                break;
+            }
+            (Some(a), Some(b)) => {
+                acc = Some(a && b);
+            }
+            (_, _) => {
+                acc = None;
+            }
+        }
+    }
+    acc
+}
+
+#[inline]
+fn evaluate_or(children: &[NodeId], results: &EvaluationResult) -> Option<bool> {
+    let mut acc = Some(false);
+    for child_id in children {
+        match (acc, results.get_result(*child_id)) {
+            (Some(true), _) => {
+                acc = Some(true);
+                break;
+            }
+            (_, Some(true)) => {
+                acc = Some(true);
+                break;
+            }
+            (Some(a), Some(b)) => {
+                acc = Some(a || b);
+            }
+            (_, _) => {
+                acc = None;
+            }
+        }
+    }
+
+    acc
 }
 
 #[derive(Clone, Debug)]

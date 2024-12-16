@@ -16,11 +16,17 @@
 //!     AttributeDefinition::integer_list("segment_ids"),
 //! ]).unwrap();
 //!
+//! let expression_1 = r#"deal_ids one of ["deal-1", "deal-2"]"#;
+//! let expression_2 = r#"segment_ids one of [1, 2, 3, 4]"#;
 //! // Insert the arbitrary boolean expressions
-//! let mut mappings = HashMap::new();
-//! for expression in &[r#"deal_ids one of ["deal-1", "deal-2"]"#, r#"segment_ids one of [1, 2, 3, 4]"#, r#"debug"#] {
-//!     let id = atree.insert(expression).unwrap();
-//!     mappings.insert(id, expression);
+//! let expressions_by_ids = vec![
+//!     (1u64, expression_1),
+//!     (2u64, expression_2)
+//! ];
+//! let mut mappings: HashMap<u64, &str> = HashMap::new();
+//! for (id, expression) in &expressions_by_ids {
+//!     atree.insert(*id, expression).unwrap();
+//!     mappings.insert(*id, expression);
 //! }
 //!
 //! // Create an event

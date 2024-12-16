@@ -19,8 +19,8 @@ type ExpressionId = u64;
 ///
 /// [module documentation]: index.html
 #[derive(Clone, Debug)]
-pub struct ATree {
-    nodes: Slab<Entry>,
+pub struct ATree<T> {
+    nodes: Slab<Entry<T>>,
     strings: StringTable,
     attributes: AttributeTable,
     roots: Vec<NodeId>,
@@ -29,7 +29,7 @@ pub struct ATree {
     expression_to_node: BiMap<ExpressionId, NodeId>,
 }
 
-impl ATree {
+impl<T> ATree<T> {
     const DEFAULT_PREDICATES: usize = 1000;
     const DEFAULT_NODES: usize = 2000;
     const DEFAULT_ROOTS: usize = 50;
@@ -46,7 +46,7 @@ impl ATree {
     ///     AttributeDefinition::boolean("private"),
     ///     AttributeDefinition::integer("exchange_id")
     /// ];
-    /// let result = ATree::new(&definitions);
+    /// let result = ATree::<u64>::new(&definitions);
     /// assert!(result.is_ok());
     /// ```
     ///
@@ -59,7 +59,7 @@ impl ATree {
     ///     AttributeDefinition::boolean("private"),
     ///     AttributeDefinition::boolean("private"),
     /// ];
-    /// let result = ATree::new(&definitions);
+    /// let result = ATree::<u64>::new(&definitions);
     /// assert!(result.is_err());
     /// ```
     pub fn new(definitions: &[AttributeDefinition]) -> Result<Self, ATreeError> {
@@ -88,20 +88,22 @@ impl ATree {
     ///     AttributeDefinition::integer("exchange_id")
     /// ];
     /// let mut atree = ATree::new(&definitions).unwrap();
-    /// assert!(atree.insert("exchange_id = 5").is_ok());
-    /// assert!(atree.insert("private").is_ok());
+    /// assert!(atree.insert(1u64, "exchange_id = 5").is_ok());
+    /// assert!(atree.insert(2u64, "private").is_ok());
     /// ```
-    pub fn insert<'a>(&'a mut self, abe: &'a str) -> Result<NodeId, ATreeError<'a>> {
+    pub fn insert<'a>(&'a mut self, user_id: T, abe: &'a str) -> Result<(), ATreeError<'a>> {
         let ast = parser::parse(abe, &self.attributes, &mut self.strings)
             .map_err(ATreeError::ParseError)?;
-        Ok(self.insert_root(ast))
+        self.insert_root(user_id, ast);
+        Ok(())
     }
 
-    fn insert_root(&mut self, root: Node) -> NodeId {
+    fn insert_root(&mut self, user_id: T, root: Node) {
         let expression_id = root.id();
         if let Some(node_id) = self.expression_to_node.get_by_left(&expression_id) {
+            add_user_id(user_id, *node_id, &mut self.nodes);
             increment_use_count(*node_id, &mut self.nodes);
-            return *node_id;
+            return;
         }
 
         let is_and = matches!(&root, Node::And(_, _));
@@ -121,6 +123,7 @@ impl ATree {
                     &mut self.nodes,
                     &expression_id,
                     rnode,
+                    Some(user_id),
                 );
                 add_parent(&mut self.nodes[left_id], node_id);
                 add_parent(&mut self.nodes[right_id], node_id);
@@ -139,6 +142,7 @@ impl ATree {
                     &mut self.nodes,
                     &expression_id,
                     rnode,
+                    Some(user_id),
                 );
                 add_parent(&mut self.nodes[child_id], node_id);
                 node_id
@@ -150,6 +154,7 @@ impl ATree {
                     &mut self.nodes,
                     &expression_id,
                     rnode,
+                    Some(user_id),
                 );
                 self.predicates.push(node_id);
                 node_id
@@ -157,13 +162,13 @@ impl ATree {
         };
         self.roots.push(node_id);
         self.max_level = get_max_level(&self.roots, &self.nodes);
-        node_id
     }
 
     fn insert_node(&mut self, node: Node) -> NodeId {
         let expression_id = node.id();
         if let Some(node_id) = self.expression_to_node.get_by_left(&expression_id) {
             increment_use_count(*node_id, &mut self.nodes);
+            from_rnode_to_lnode(*node_id, &mut self.nodes);
             return *node_id;
         }
 
@@ -186,6 +191,7 @@ impl ATree {
                     &mut self.nodes,
                     &expression_id,
                     inode,
+                    None,
                 );
                 add_parent(&mut self.nodes[left_id], node_id);
                 add_parent(&mut self.nodes[right_id], node_id);
@@ -205,6 +211,7 @@ impl ATree {
                     &mut self.nodes,
                     &expression_id,
                     inode,
+                    None,
                 );
                 add_parent(&mut self.nodes[child_id], node_id);
                 node_id
@@ -216,6 +223,7 @@ impl ATree {
                     &mut self.nodes,
                     &expression_id,
                     lnode,
+                    None,
                 );
                 self.predicates.push(node_id);
                 node_id
@@ -232,9 +240,9 @@ impl ATree {
     }
 
     /// Search the [`ATree`] for arbitrary boolean expressions that match the [`Event`].
-    pub fn search(&self, event: Event) -> Result<Report, ATreeError> {
+    pub fn search(&self, event: Event) -> Result<Report<T>, ATreeError> {
         let mut results = EvaluationResult::new(self.nodes.len());
-        let mut matches = Vec::<NodeId>::with_capacity(50);
+        let mut matches = Vec::with_capacity(50);
 
         // Since the predicates will already be evaluated and their parents will be put into the
         // queues, then there is no need to keep a queue for them.
@@ -263,7 +271,9 @@ impl ATree {
                 let entry = &self.nodes[node_id];
                 if entry.is_root() {
                     if let Some(true) = result {
-                        matches.push(node_id);
+                        for user_id in &entry.user_ids {
+                            matches.push(user_id);
+                        }
                     }
                     continue;
                 }
@@ -282,13 +292,14 @@ impl ATree {
 }
 
 #[inline]
-fn insert_node(
+fn insert_node<T>(
     expression_to_node: &mut BiMap<ExpressionId, NodeId>,
-    nodes: &mut Slab<Entry>,
+    nodes: &mut Slab<Entry<T>>,
     expression_id: &ExpressionId,
     node: ATreeNode,
+    user_id: Option<T>,
 ) -> NodeId {
-    let entry = Entry::new(*expression_id, node);
+    let entry = Entry::new(*expression_id, node, user_id);
     let node_id = nodes.insert(entry);
     expression_to_node
         .insert_no_overwrite(*expression_id, node_id)
@@ -297,17 +308,39 @@ fn insert_node(
 }
 
 #[inline]
-fn add_parent(entry: &mut Entry, node_id: NodeId) {
+fn add_parent<T>(entry: &mut Entry<T>, node_id: NodeId) {
     entry.node.add_parent(node_id);
 }
 
 #[inline]
-fn increment_use_count(node_id: NodeId, nodes: &mut Slab<Entry>) {
+fn add_user_id<T>(user_id: T, node_id: NodeId, nodes: &mut Slab<Entry<T>>) {
+    nodes[node_id].user_ids.push(user_id);
+}
+
+#[inline]
+fn increment_use_count<T>(node_id: NodeId, nodes: &mut Slab<Entry<T>>) {
     nodes[node_id].use_count += 1;
 }
 
 #[inline]
-fn get_max_level(roots: &[NodeId], nodes: &Slab<Entry>) -> usize {
+fn from_rnode_to_lnode<T>(node_id: NodeId, nodes: &mut Slab<Entry<T>>) {
+    let node = &nodes[node_id];
+    if let ATreeNode::RNode(RNode {
+        operator: Operator::Value(predicate),
+        ..
+    }) = &node.node
+    {
+        let lnode = LNode {
+            parents: vec![],
+            level: 1,
+            predicate: predicate.clone(),
+        };
+        let _ = std::mem::replace(&mut nodes[node_id].node, ATreeNode::LNode(lnode));
+    }
+}
+
+#[inline]
+fn get_max_level<T>(roots: &[NodeId], nodes: &Slab<Entry<T>>) -> usize {
     roots
         .iter()
         .map(|root_id| nodes[*root_id].level())
@@ -316,22 +349,24 @@ fn get_max_level(roots: &[NodeId], nodes: &Slab<Entry>) -> usize {
 }
 
 #[inline]
-fn evaluate_predicates<'a>(
+fn evaluate_predicates<'a, T>(
     predicates: &[NodeId],
-    nodes: &'a Slab<Entry>,
+    nodes: &'a Slab<Entry<T>>,
     event: &Event,
-    matches: &mut Vec<NodeId>,
+    matches: &mut Vec<&'a T>,
     results: &mut EvaluationResult,
-    queues: &mut [Vec<(NodeId, &'a Entry)>],
+    queues: &mut [Vec<(NodeId, &'a Entry<T>)>],
 ) {
     for predicate_id in predicates {
         let node = &nodes[*predicate_id];
         let result = node.evaluate(event);
         results.set_result(*predicate_id, result);
 
-        if node.is_root() {
+        if !node.user_ids.is_empty() {
             if let Some(true) = result {
-                matches.push(*predicate_id);
+                for user_id in &node.user_ids {
+                    matches.push(user_id);
+                }
             }
         } else {
             node.parents()
@@ -345,7 +380,11 @@ fn evaluate_predicates<'a>(
 }
 
 #[inline]
-fn evaluate_node(node_id: NodeId, node: &Entry, results: &mut EvaluationResult) -> Option<bool> {
+fn evaluate_node<T>(
+    node_id: NodeId,
+    node: &Entry<T>,
+    results: &mut EvaluationResult,
+) -> Option<bool> {
     let operator = node.operator();
     let result = match operator {
         Operator::And => node.children().iter().try_fold(true, |acc, child_id| {
@@ -368,18 +407,20 @@ fn evaluate_node(node_id: NodeId, node: &Entry, results: &mut EvaluationResult) 
 }
 
 #[derive(Clone, Debug)]
-struct Entry {
+struct Entry<T> {
     id: ExpressionId,
+    user_ids: Vec<T>,
     node: ATreeNode,
     use_count: usize,
 }
 
-impl Entry {
-    fn new(id: ExpressionId, node: ATreeNode) -> Self {
+impl<T> Entry<T> {
+    fn new(id: ExpressionId, node: ATreeNode, user_id: Option<T>) -> Self {
         Self {
             id,
             node,
             use_count: 1,
+            user_ids: user_id.map_or_else(Vec::new, |user_id| vec![user_id]),
         }
     }
 
@@ -396,11 +437,6 @@ impl Entry {
     #[inline]
     const fn is_root(&self) -> bool {
         self.node.is_root()
-    }
-
-    #[inline]
-    const fn is_predicate(&self) -> bool {
-        self.node.is_predicate()
     }
 
     #[inline]
@@ -464,18 +500,6 @@ impl ATreeNode {
     }
 
     #[inline]
-    const fn is_predicate(&self) -> bool {
-        matches!(
-            self,
-            Self::LNode(_)
-                | Self::RNode(RNode {
-                    operator: Operator::Value(_),
-                    ..
-                })
-        )
-    }
-
-    #[inline]
     fn operator(&self) -> Operator {
         match self {
             Self::RNode(RNode {
@@ -530,13 +554,6 @@ struct LNode {
     predicate: Predicate,
 }
 
-impl LNode {
-    #[inline]
-    fn id(&self) -> u64 {
-        self.predicate.id()
-    }
-}
-
 #[derive(Clone, Debug)]
 struct INode {
     parents: Vec<NodeId>,
@@ -564,17 +581,17 @@ impl RNode {
 }
 
 #[derive(Debug)]
-pub struct Report {
-    matches: Vec<usize>,
+pub struct Report<'a, T> {
+    matches: Vec<&'a T>,
 }
 
-impl Report {
-    fn new(matches: Vec<NodeId>) -> Self {
+impl<'a, T> Report<'a, T> {
+    const fn new(matches: Vec<&'a T>) -> Self {
         Self { matches }
     }
 
     #[inline]
-    pub fn matches(&self) -> &[NodeId] {
+    pub fn matches(&self) -> &[&'a T] {
         &self.matches
     }
 }
@@ -604,7 +621,7 @@ mod tests {
             AttributeDefinition::integer_list("segment_ids"),
         ];
 
-        let result = ATree::new(&definitions);
+        let result = ATree::<u64>::new(&definitions);
 
         assert!(result.is_ok());
     }
@@ -621,7 +638,7 @@ mod tests {
             AttributeDefinition::integer_list("segment_ids"),
         ];
 
-        let result = ATree::new(&definitions);
+        let result = ATree::<u64>::new(&definitions);
 
         assert!(result.is_err());
     }
@@ -637,7 +654,7 @@ mod tests {
         ];
         let mut atree = ATree::new(&definitions).unwrap();
 
-        let result = atree.insert(AN_INVALID_BOOLEAN_EXPRESSION);
+        let result = atree.insert(1u64, AN_INVALID_BOOLEAN_EXPRESSION);
 
         assert!(result.is_err());
     }
@@ -653,7 +670,7 @@ mod tests {
         ];
         let mut atree = ATree::new(&definitions).unwrap();
 
-        let result = atree.insert("");
+        let result = atree.insert(1u64, "");
 
         assert!(result.is_err());
     }
@@ -669,7 +686,7 @@ mod tests {
         ];
         let mut atree = ATree::new(&definitions).unwrap();
 
-        let result = atree.insert(AN_EXPRESSION);
+        let result = atree.insert(1u64, AN_EXPRESSION);
 
         assert!(result.is_ok());
     }
@@ -685,8 +702,8 @@ mod tests {
         ];
         let mut atree = ATree::new(&definitions).unwrap();
 
-        assert!(atree.insert(AN_EXPRESSION).is_ok());
-        assert!(atree.insert(AN_EXPRESSION).is_ok());
+        assert!(atree.insert(1u64, AN_EXPRESSION).is_ok());
+        assert!(atree.insert(2u64, AN_EXPRESSION).is_ok());
     }
 
     #[test]
@@ -700,7 +717,7 @@ mod tests {
         ];
         let mut atree = ATree::new(&definitions).unwrap();
 
-        let result = atree.insert(A_NOT_EXPRESSION);
+        let result = atree.insert(1u64, A_NOT_EXPRESSION);
 
         assert!(result.is_ok());
     }
@@ -716,7 +733,7 @@ mod tests {
         ];
         let mut atree = ATree::new(&definitions).unwrap();
 
-        let result = atree.insert(AN_EXPRESSION_WITH_AND_OPERATORS);
+        let result = atree.insert(1u64, AN_EXPRESSION_WITH_AND_OPERATORS);
 
         assert!(result.is_ok());
     }
@@ -732,7 +749,7 @@ mod tests {
         ];
         let mut atree = ATree::new(&definitions).unwrap();
 
-        let result = atree.insert(AN_EXPRESSION_WITH_OR_OPERATORS);
+        let result = atree.insert(1u64, AN_EXPRESSION_WITH_OR_OPERATORS);
 
         assert!(result.is_ok());
     }
@@ -749,7 +766,7 @@ mod tests {
         ];
         let mut atree = ATree::new(&definitions).unwrap();
 
-        let result = atree.insert(A_COMPLEX_EXPRESSION);
+        let result = atree.insert(1u64, A_COMPLEX_EXPRESSION);
 
         assert!(result.is_ok());
     }
@@ -766,8 +783,8 @@ mod tests {
         ];
         let mut atree = ATree::new(&definitions).unwrap();
 
-        assert!(atree.insert(A_COMPLEX_EXPRESSION).is_ok());
-        assert!(atree.insert(ANOTHER_COMPLEX_EXPRESSION).is_ok());
+        assert!(atree.insert(1u64, A_COMPLEX_EXPRESSION).is_ok());
+        assert!(atree.insert(2u64, ANOTHER_COMPLEX_EXPRESSION).is_ok());
     }
 
     #[test]
@@ -782,10 +799,34 @@ mod tests {
             AttributeDefinition::string("city"),
         ];
         let mut atree = ATree::new(&definitions).unwrap();
+        atree.insert(1u64, "private").unwrap();
+        atree.insert(2u64, "not private").unwrap();
+        let mut builder = atree.make_event();
+        builder.with_boolean("private", true).unwrap();
+        let event = builder.build().unwrap();
 
-        let _ = atree.insert(A_COMPLEX_EXPRESSION).unwrap();
-        let id = atree.insert(AN_EXPRESSION_WITH_AND_OPERATORS).unwrap();
-        let another_id = atree.insert(AN_EXPRESSION_WITH_OR_OPERATORS).unwrap();
+        let expected = vec![&1u64];
+        let mut actual = atree.search(event).unwrap().matches().to_vec();
+        actual.sort();
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn can_search_complex_expressions() {
+        let definitions = [
+            AttributeDefinition::boolean("private"),
+            AttributeDefinition::integer("exchange_id"),
+            AttributeDefinition::string_list("deal_ids"),
+            AttributeDefinition::string_list("deals"),
+            AttributeDefinition::integer_list("segment_ids"),
+            AttributeDefinition::string("country"),
+            AttributeDefinition::string("city"),
+        ];
+        let mut atree = ATree::new(&definitions).unwrap();
+
+        atree.insert(1, A_COMPLEX_EXPRESSION).unwrap();
+        atree.insert(2, AN_EXPRESSION_WITH_AND_OPERATORS).unwrap();
+        atree.insert(3, AN_EXPRESSION_WITH_OR_OPERATORS).unwrap();
         let mut builder = atree.make_event();
         builder.with_integer("exchange_id", 1).unwrap();
         builder.with_boolean("private", true).unwrap();
@@ -799,9 +840,8 @@ mod tests {
         builder.with_string("country", "FR").unwrap();
         let event = builder.build().unwrap();
 
-        let mut expected = vec![id, another_id];
+        let expected = vec![&2, &3];
         let mut actual = atree.search(event).unwrap().matches().to_vec();
-        expected.sort();
         actual.sort();
         assert_eq!(expected, actual);
     }

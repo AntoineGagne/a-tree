@@ -17,10 +17,14 @@ fn main() {
     let mut atree = ATree::new(&attributes).unwrap();
 
     // Insert the arbitrary boolean expressions
-    let mut mappings = HashMap::new();
-    for expression in &[FIRST_EXPRESSION, SECOND_EXPRESSION, THIRD_EXPRESSION] {
-        let id = atree.insert(expression).unwrap();
-        mappings.insert(id, expression);
+    let expressions_by_ids = [
+        (1, FIRST_EXPRESSION),
+        (2, SECOND_EXPRESSION),
+        (3, THIRD_EXPRESSION),
+    ];
+    let mappings: HashMap<u64, &str> = HashMap::from_iter(expressions_by_ids);
+    for (id, expression) in &expressions_by_ids {
+        atree.insert(id, expression).unwrap();
     }
 
     // Create the matching event

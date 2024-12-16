@@ -63,7 +63,7 @@ impl<'atree> EventBuilder<'atree> {
     ///     AttributeDefinition::integer("exchange_id"),
     ///     AttributeDefinition::string_list("deal_ids"),
     /// ];
-    /// let atree = ATree::new(&definitions).unwrap();
+    /// let atree = ATree::<u64>::new(&definitions).unwrap();
     ///
     /// let mut builder = atree.make_event();
     /// builder.with_integer("exchange_id", 1).unwrap();

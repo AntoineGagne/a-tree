@@ -322,23 +322,6 @@ fn increment_use_count<T>(node_id: NodeId, nodes: &mut Slab<Entry<T>>) {
 }
 
 #[inline]
-fn from_rnode_to_lnode<T>(node_id: NodeId, nodes: &mut Slab<Entry<T>>) {
-    let node = &nodes[node_id];
-    if let ATreeNode::RNode(RNode {
-        operator: Operator::Value(predicate),
-        ..
-    }) = &node.node
-    {
-        let lnode = LNode {
-            parents: vec![],
-            level: 1,
-            predicate: predicate.clone(),
-        };
-        let _ = std::mem::replace(&mut nodes[node_id].node, ATreeNode::LNode(lnode));
-    }
-}
-
-#[inline]
 fn get_max_level<T>(roots: &[NodeId], nodes: &Slab<Entry<T>>) -> usize {
     roots
         .iter()
@@ -395,7 +378,6 @@ fn evaluate_node<T>(
                 .unwrap_or_else(|| panic!("trying to extract from empty not"));
             results.get_result(*child_id).map(|result| !result)
         }
-        Operator::Value(_) => unreachable!(),
     };
     results.set_result(node_id, result);
     result
@@ -530,10 +512,6 @@ impl ATreeNode {
     fn evaluate(&self, event: &Event) -> Option<bool> {
         match self {
             Self::LNode(node) => node.predicate.evaluate(event),
-            Self::RNode(RNode {
-                operator: Operator::Value(predicate),
-                ..
-            }) => predicate.evaluate(event),
             node => unreachable!("evaluating {node:?} which is not a predicate; this is a bug."),
         }
     }
@@ -546,11 +524,7 @@ impl ATreeNode {
     #[inline]
     fn operator(&self) -> Operator {
         match self {
-            Self::RNode(RNode {
-                operator: Operator::Value(_),
-                ..
-            })
-            | Self::LNode(_) => {
+            Self::LNode(_) => {
                 unreachable!("trying to get the operator of leaf node; this is a bug");
             }
             Self::RNode(RNode { operator, .. }) | Self::INode(INode { operator, .. }) => {

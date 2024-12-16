@@ -16,7 +16,6 @@ pub enum Operator {
     And,
     Or,
     Not,
-    Value(Predicate),
 }
 
 impl Node {

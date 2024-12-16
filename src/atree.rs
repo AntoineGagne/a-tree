@@ -788,6 +788,27 @@ mod tests {
     }
 
     #[test]
+    fn can_search_an_empty_tree() {
+        let definitions = [
+            AttributeDefinition::boolean("private"),
+            AttributeDefinition::integer("exchange_id"),
+            AttributeDefinition::string_list("deal_ids"),
+            AttributeDefinition::string_list("deals"),
+            AttributeDefinition::integer_list("segment_ids"),
+            AttributeDefinition::string("country"),
+            AttributeDefinition::string("city"),
+        ];
+        let atree = ATree::new(&definitions).unwrap();
+        let mut builder = atree.make_event();
+        builder.with_boolean("private", false).unwrap();
+        let event = builder.build().unwrap();
+
+        let expected: Vec<&u64> = vec![];
+        let actual = atree.search(event).unwrap().matches().to_vec();
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
     fn can_search_a_single_predicate() {
         let definitions = [
             AttributeDefinition::boolean("private"),
@@ -805,6 +826,29 @@ mod tests {
         let event = builder.build().unwrap();
 
         let expected = vec![&1u64];
+        let actual = atree.search(event).unwrap().matches().to_vec();
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn ignore_results_that_are_not_matched() {
+        let definitions = [
+            AttributeDefinition::boolean("private"),
+            AttributeDefinition::integer("exchange_id"),
+            AttributeDefinition::string_list("deal_ids"),
+            AttributeDefinition::string_list("deals"),
+            AttributeDefinition::integer_list("segment_ids"),
+            AttributeDefinition::string("country"),
+            AttributeDefinition::string("city"),
+        ];
+        let mut atree = ATree::new(&definitions).unwrap();
+        atree.insert(1u64, "private").unwrap();
+        atree.insert(2u64, A_COMPLEX_EXPRESSION).unwrap();
+        let mut builder = atree.make_event();
+        builder.with_boolean("private", false).unwrap();
+        let event = builder.build().unwrap();
+
+        let expected: Vec<&u64> = vec![];
         let actual = atree.search(event).unwrap().matches().to_vec();
         assert_eq!(expected, actual);
     }

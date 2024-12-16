@@ -628,6 +628,7 @@ impl RNode {
 }
 
 #[derive(Debug)]
+/// Structure that holds the search results from the [`ATree::search()`] function
 pub struct Report<'a, T> {
     matches: Vec<&'a T>,
 }
@@ -638,6 +639,7 @@ impl<'a, T> Report<'a, T> {
     }
 
     #[inline]
+    /// Get the search matches
     pub fn matches(&self) -> &[&'a T] {
         &self.matches
     }

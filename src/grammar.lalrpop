@@ -3,7 +3,7 @@ use crate::{
     lexer::Token,
     ast,
     predicates,
-    events::{AttributeTable, EventError},
+    events::AttributeTable,
     strings::StringTable,
 };
 use itertools::Itertools;

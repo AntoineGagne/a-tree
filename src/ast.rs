@@ -1,5 +1,5 @@
 use crate::predicates::Predicate;
-use std::hash::{Hash, Hasher};
+use std::hash::Hash;
 
 pub type TreeNode = Box<Node>;
 

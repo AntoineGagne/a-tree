@@ -10,14 +10,10 @@ edition = "2021"
 build = "build.rs"
 categories = ["data-structures"]
 keywords = [
-    "adtech",
     "boolean-expression",
-    "boolean-logic",
     "data-structure",
     "data-structures",
     "event-filtering",
-    "optimization",
-    "search",
     "tree"
 ]
 

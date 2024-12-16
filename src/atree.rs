@@ -659,6 +659,13 @@ mod tests {
     const A_COMPLEX_EXPRESSION: &str = r#"exchange_id = 1 and not private and deal_ids one of ["deal-1", "deal-2"] and segment_ids one of [1, 2, 3] and country = 'CA' and city in ['QC'] or country = 'US' and city in ['AZ']"#;
     const ANOTHER_COMPLEX_EXPRESSION: &str = r#"exchange_id = 1 and not private and deal_ids one of ["deal-1", "deal-2"] and segment_ids one of [1, 2, 3] and country in ['FR', 'GB']"#;
 
+    fn is_sync_and_send<T: Send + Sync>() {}
+
+    #[test]
+    fn support_sync_and_send_traits() {
+        is_sync_and_send::<ATree<u64>>();
+    }
+
     #[test]
     fn can_build_an_atree() {
         let definitions = [

@@ -788,7 +788,29 @@ mod tests {
     }
 
     #[test]
-    fn can_search_inside_the_tree() {
+    fn can_search_a_single_predicate() {
+        let definitions = [
+            AttributeDefinition::boolean("private"),
+            AttributeDefinition::integer("exchange_id"),
+            AttributeDefinition::string_list("deal_ids"),
+            AttributeDefinition::string_list("deals"),
+            AttributeDefinition::integer_list("segment_ids"),
+            AttributeDefinition::string("country"),
+            AttributeDefinition::string("city"),
+        ];
+        let mut atree = ATree::new(&definitions).unwrap();
+        atree.insert(1u64, "private").unwrap();
+        let mut builder = atree.make_event();
+        builder.with_boolean("private", true).unwrap();
+        let event = builder.build().unwrap();
+
+        let expected = vec![&1u64];
+        let actual = atree.search(event).unwrap().matches().to_vec();
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn can_search_simple_expressions() {
         let definitions = [
             AttributeDefinition::boolean("private"),
             AttributeDefinition::integer("exchange_id"),

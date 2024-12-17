@@ -110,6 +110,7 @@ impl<T: Eq + Hash + Clone> ATree<T> {
         }
 
         let is_and = matches!(&root, Node::And(_, _));
+        let cost = root.cost();
         let node_id = match root {
             Node::And(left, right) | Node::Or(left, right) => {
                 let left_id = self.insert_node(*left);
@@ -119,7 +120,11 @@ impl<T: Eq + Hash + Clone> ATree<T> {
                 let rnode = ATreeNode::RNode(RNode {
                     level: 1 + std::cmp::max(left_entry.node.level(), right_entry.node.level()),
                     operator: if is_and { Operator::And } else { Operator::Or },
-                    children: vec![left_id, right_id],
+                    children: if left_entry.cost > right_entry.cost {
+                        vec![right_id, left_id]
+                    } else {
+                        vec![left_id, right_id]
+                    },
                 });
                 let node_id = insert_node(
                     &mut self.expression_to_node,
@@ -127,6 +132,7 @@ impl<T: Eq + Hash + Clone> ATree<T> {
                     &expression_id,
                     rnode,
                     Some(user_id.clone()),
+                    cost,
                 );
                 add_parent(&mut self.nodes[left_id], node_id);
                 add_parent(&mut self.nodes[right_id], node_id);
@@ -146,6 +152,7 @@ impl<T: Eq + Hash + Clone> ATree<T> {
                     &expression_id,
                     rnode,
                     Some(user_id.clone()),
+                    cost,
                 );
                 add_parent(&mut self.nodes[child_id], node_id);
                 node_id
@@ -158,6 +165,7 @@ impl<T: Eq + Hash + Clone> ATree<T> {
                     &expression_id,
                     lnode,
                     Some(user_id.clone()),
+                    cost,
                 );
                 self.predicates.push(node_id);
                 node_id
@@ -177,6 +185,7 @@ impl<T: Eq + Hash + Clone> ATree<T> {
         }
 
         let is_and = matches!(node, Node::And(_, _));
+        let cost = node.cost();
         match node {
             Node::And(left, right) | Node::Or(left, right) => {
                 let left_id = self.insert_node(*left);
@@ -187,7 +196,11 @@ impl<T: Eq + Hash + Clone> ATree<T> {
                     parents: vec![],
                     level: 1 + std::cmp::max(left_entry.node.level(), right_entry.node.level()),
                     operator: if is_and { Operator::And } else { Operator::Or },
-                    children: vec![left_id, right_id],
+                    children: if left_entry.cost > right_entry.cost {
+                        vec![right_id, left_id]
+                    } else {
+                        vec![left_id, right_id]
+                    },
                 };
                 let inode = ATreeNode::INode(inode);
                 let node_id = insert_node(
@@ -196,6 +209,7 @@ impl<T: Eq + Hash + Clone> ATree<T> {
                     &expression_id,
                     inode,
                     None,
+                    cost,
                 );
                 add_parent(&mut self.nodes[left_id], node_id);
                 add_parent(&mut self.nodes[right_id], node_id);
@@ -216,6 +230,7 @@ impl<T: Eq + Hash + Clone> ATree<T> {
                     &expression_id,
                     inode,
                     None,
+                    cost,
                 );
                 add_parent(&mut self.nodes[child_id], node_id);
                 node_id
@@ -228,6 +243,7 @@ impl<T: Eq + Hash + Clone> ATree<T> {
                     &expression_id,
                     lnode,
                     None,
+                    cost,
                 );
                 self.predicates.push(node_id);
                 node_id
@@ -251,7 +267,7 @@ impl<T: Eq + Hash + Clone> ATree<T> {
         // Since the predicates will already be evaluated and their parents will be put into the
         // queues, then there is no need to keep a queue for them.
         let mut queues = vec![Vec::with_capacity(50); self.max_level - 1];
-        evaluate_predicates(
+        process_predicates(
             &self.predicates,
             &self.nodes,
             &event,
@@ -266,7 +282,7 @@ impl<T: Eq + Hash + Clone> ATree<T> {
                     continue;
                 }
 
-                let result = evaluate_node(node_id, node, &mut results);
+                let result = evaluate_node(node_id, &event, node, &self.nodes, &mut results);
 
                 if result.is_none() {
                     continue;
@@ -361,8 +377,9 @@ fn insert_node<T>(
     expression_id: &ExpressionId,
     node: ATreeNode,
     user_id: Option<T>,
+    cost: u64,
 ) -> NodeId {
-    let entry = Entry::new(*expression_id, node, user_id);
+    let entry = Entry::new(*expression_id, node, user_id, cost);
     let node_id = nodes.insert(entry);
     expression_to_node
         .insert_no_overwrite(*expression_id, node_id)
@@ -420,7 +437,7 @@ fn change_rnode_to_inode<T>(node_id: NodeId, nodes: &mut Slab<Entry<T>>) {
 }
 
 #[inline]
-fn evaluate_predicates<'a, T>(
+fn process_predicates<'a, T>(
     predicates: &[NodeId],
     nodes: &'a Slab<Entry<T>>,
     event: &Event,
@@ -430,10 +447,12 @@ fn evaluate_predicates<'a, T>(
 ) {
     for predicate_id in predicates {
         let node = &nodes[*predicate_id];
-        let result = node.evaluate(event);
-        results.set_result(*predicate_id, result);
-
+        // There is no point in delaying the evaluation of those predicates since they need to be
+        // evaluated since they count against the top level expressions
         if !node.user_ids.is_empty() {
+            let result = node.evaluate(event);
+            results.set_result(*predicate_id, result);
+
             if let Some(true) = result {
                 for user_id in &node.user_ids {
                     matches.push(user_id);
@@ -453,19 +472,21 @@ fn evaluate_predicates<'a, T>(
 #[inline]
 fn evaluate_node<T>(
     node_id: NodeId,
+    event: &Event,
     node: &Entry<T>,
+    nodes: &Slab<Entry<T>>,
     results: &mut EvaluationResult,
 ) -> Option<bool> {
     let operator = node.operator();
     let result = match operator {
-        Operator::And => evaluate_and(node.children(), results),
-        Operator::Or => evaluate_or(node.children(), results),
+        Operator::And => evaluate_and(node.children(), event, nodes, results),
+        Operator::Or => evaluate_or(node.children(), event, nodes, results),
         Operator::Not => {
             let child_id = node
                 .children()
                 .first()
                 .unwrap_or_else(|| panic!("trying to extract from empty not"));
-            results.get_result(*child_id).map(|result| !result)
+            lazy_evaluate(*child_id, event, nodes, results).map(|result| !result)
         }
     };
     results.set_result(node_id, result);
@@ -473,10 +494,15 @@ fn evaluate_node<T>(
 }
 
 #[inline]
-fn evaluate_and(children: &[NodeId], results: &EvaluationResult) -> Option<bool> {
+fn evaluate_and<T>(
+    children: &[NodeId],
+    event: &Event,
+    nodes: &Slab<Entry<T>>,
+    results: &mut EvaluationResult,
+) -> Option<bool> {
     let mut acc = Some(true);
     for child_id in children {
-        match (acc, results.get_result(*child_id)) {
+        match (acc, lazy_evaluate(*child_id, event, nodes, results)) {
             (Some(false), _) => {
                 acc = Some(false);
                 break;
@@ -497,10 +523,15 @@ fn evaluate_and(children: &[NodeId], results: &EvaluationResult) -> Option<bool>
 }
 
 #[inline]
-fn evaluate_or(children: &[NodeId], results: &EvaluationResult) -> Option<bool> {
+fn evaluate_or<T>(
+    children: &[NodeId],
+    event: &Event,
+    nodes: &Slab<Entry<T>>,
+    results: &mut EvaluationResult,
+) -> Option<bool> {
     let mut acc = Some(false);
     for child_id in children {
-        match (acc, results.get_result(*child_id)) {
+        match (acc, lazy_evaluate(*child_id, event, nodes, results)) {
             (Some(true), _) => {
                 acc = Some(true);
                 break;
@@ -521,21 +552,39 @@ fn evaluate_or(children: &[NodeId], results: &EvaluationResult) -> Option<bool> 
     acc
 }
 
+#[inline]
+fn lazy_evaluate<T>(
+    node_id: NodeId,
+    event: &Event,
+    nodes: &Slab<Entry<T>>,
+    results: &mut EvaluationResult,
+) -> Option<bool> {
+    if results.is_evaluated(node_id) {
+        return results.get_result(node_id);
+    }
+    let node = &nodes[node_id];
+    let result = node.evaluate(event);
+    results.set_result(node_id, result);
+    result
+}
+
 #[derive(Clone, Debug)]
 struct Entry<T> {
     id: ExpressionId,
     user_ids: Vec<T>,
     node: ATreeNode,
     use_count: usize,
+    cost: u64,
 }
 
 impl<T> Entry<T> {
-    fn new(id: ExpressionId, node: ATreeNode, user_id: Option<T>) -> Self {
+    fn new(id: ExpressionId, node: ATreeNode, user_id: Option<T>, cost: u64) -> Self {
         Self {
             id,
             node,
             use_count: 1,
             user_ids: user_id.map_or_else(Vec::new, |user_id| vec![user_id]),
+            cost,
         }
     }
 

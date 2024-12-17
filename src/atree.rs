@@ -91,20 +91,20 @@ impl<T: Eq + Hash + Clone> ATree<T> {
     ///     AttributeDefinition::integer("exchange_id")
     /// ];
     /// let mut atree = ATree::new(&definitions).unwrap();
-    /// assert!(atree.insert(1u64, "exchange_id = 5").is_ok());
-    /// assert!(atree.insert(2u64, "private").is_ok());
+    /// assert!(atree.insert(&1u64, "exchange_id = 5").is_ok());
+    /// assert!(atree.insert(&2u64, "private").is_ok());
     /// ```
-    pub fn insert<'a>(&'a mut self, user_id: T, abe: &'a str) -> Result<(), ATreeError<'a>> {
+    pub fn insert<'a>(&'a mut self, user_id: &T, abe: &'a str) -> Result<(), ATreeError<'a>> {
         let ast = parser::parse(abe, &self.attributes, &mut self.strings)
             .map_err(ATreeError::ParseError)?;
         self.insert_root(user_id, ast);
         Ok(())
     }
 
-    fn insert_root(&mut self, user_id: T, root: Node) {
+    fn insert_root(&mut self, user_id: &T, root: Node) {
         let expression_id = root.id();
         if let Some(node_id) = self.expression_to_node.get_by_left(&expression_id) {
-            add_user_id(&user_id, *node_id, &mut self.nodes, &mut self.nodes_by_ids);
+            add_user_id(user_id, *node_id, &mut self.nodes, &mut self.nodes_by_ids);
             increment_use_count(*node_id, &mut self.nodes);
             return;
         }
@@ -163,7 +163,7 @@ impl<T: Eq + Hash + Clone> ATree<T> {
                 node_id
             }
         };
-        self.nodes_by_ids.insert(user_id, node_id);
+        self.nodes_by_ids.insert(user_id.clone(), node_id);
         self.roots.push(node_id);
         self.max_level = get_max_level(&self.roots, &self.nodes);
     }
@@ -295,6 +295,7 @@ impl<T: Eq + Hash + Clone> ATree<T> {
     }
 
     #[inline]
+    /// Delete the specified expression
     pub fn delete(&mut self, id: &T) {
         if let Some(node_id) = self.nodes_by_ids.get(id) {
             self.delete_node(id, *node_id);
@@ -753,7 +754,7 @@ mod tests {
         ];
         let mut atree = ATree::new(&definitions).unwrap();
 
-        let result = atree.insert(1u64, AN_INVALID_BOOLEAN_EXPRESSION);
+        let result = atree.insert(&1u64, AN_INVALID_BOOLEAN_EXPRESSION);
 
         assert!(result.is_err());
     }
@@ -769,7 +770,7 @@ mod tests {
         ];
         let mut atree = ATree::new(&definitions).unwrap();
 
-        let result = atree.insert(1u64, "");
+        let result = atree.insert(&1u64, "");
 
         assert!(result.is_err());
     }
@@ -785,7 +786,7 @@ mod tests {
         ];
         let mut atree = ATree::new(&definitions).unwrap();
 
-        let result = atree.insert(1u64, AN_EXPRESSION);
+        let result = atree.insert(&1u64, AN_EXPRESSION);
 
         assert!(result.is_ok());
     }
@@ -801,8 +802,8 @@ mod tests {
         let another_expression =
             r#"private or exchange_id = 1 or deal_ids one of ["deal-1", "deal-2"]"#;
         let mut atree = ATree::new(&definitions).unwrap();
-        assert!(atree.insert(1u64, an_expression).is_ok());
-        assert!(atree.insert(2u64, another_expression).is_ok());
+        assert!(atree.insert(&1u64, an_expression).is_ok());
+        assert!(atree.insert(&2u64, another_expression).is_ok());
     }
 
     #[test]
@@ -816,8 +817,8 @@ mod tests {
         ];
         let mut atree = ATree::new(&definitions).unwrap();
 
-        assert!(atree.insert(1u64, AN_EXPRESSION).is_ok());
-        assert!(atree.insert(2u64, AN_EXPRESSION).is_ok());
+        assert!(atree.insert(&1u64, AN_EXPRESSION).is_ok());
+        assert!(atree.insert(&2u64, AN_EXPRESSION).is_ok());
     }
 
     #[test]
@@ -831,7 +832,7 @@ mod tests {
         ];
         let mut atree = ATree::new(&definitions).unwrap();
 
-        let result = atree.insert(1u64, A_NOT_EXPRESSION);
+        let result = atree.insert(&1u64, A_NOT_EXPRESSION);
 
         assert!(result.is_ok());
     }
@@ -847,7 +848,7 @@ mod tests {
         ];
         let mut atree = ATree::new(&definitions).unwrap();
 
-        let result = atree.insert(1u64, AN_EXPRESSION_WITH_AND_OPERATORS);
+        let result = atree.insert(&1u64, AN_EXPRESSION_WITH_AND_OPERATORS);
 
         assert!(result.is_ok());
     }
@@ -863,7 +864,7 @@ mod tests {
         ];
         let mut atree = ATree::new(&definitions).unwrap();
 
-        let result = atree.insert(1u64, AN_EXPRESSION_WITH_OR_OPERATORS);
+        let result = atree.insert(&1u64, AN_EXPRESSION_WITH_OR_OPERATORS);
 
         assert!(result.is_ok());
     }
@@ -880,7 +881,7 @@ mod tests {
         ];
         let mut atree = ATree::new(&definitions).unwrap();
 
-        let result = atree.insert(1u64, A_COMPLEX_EXPRESSION);
+        let result = atree.insert(&1u64, A_COMPLEX_EXPRESSION);
 
         assert!(result.is_ok());
     }
@@ -897,8 +898,8 @@ mod tests {
         ];
         let mut atree = ATree::new(&definitions).unwrap();
 
-        assert!(atree.insert(1u64, A_COMPLEX_EXPRESSION).is_ok());
-        assert!(atree.insert(2u64, ANOTHER_COMPLEX_EXPRESSION).is_ok());
+        assert!(atree.insert(&1u64, A_COMPLEX_EXPRESSION).is_ok());
+        assert!(atree.insert(&2u64, ANOTHER_COMPLEX_EXPRESSION).is_ok());
     }
 
     #[test]
@@ -934,7 +935,7 @@ mod tests {
             AttributeDefinition::string("city"),
         ];
         let mut atree = ATree::new(&definitions).unwrap();
-        atree.insert(1u64, "private").unwrap();
+        atree.insert(&1u64, "private").unwrap();
         let mut builder = atree.make_event();
         builder.with_boolean("private", true).unwrap();
         let event = builder.build().unwrap();
@@ -956,8 +957,8 @@ mod tests {
             AttributeDefinition::string("city"),
         ];
         let mut atree = ATree::new(&definitions).unwrap();
-        atree.insert(1u64, "private").unwrap();
-        atree.insert(2u64, A_COMPLEX_EXPRESSION).unwrap();
+        atree.insert(&1u64, "private").unwrap();
+        atree.insert(&2u64, A_COMPLEX_EXPRESSION).unwrap();
         let mut builder = atree.make_event();
         builder.with_boolean("private", false).unwrap();
         let event = builder.build().unwrap();
@@ -979,8 +980,8 @@ mod tests {
             AttributeDefinition::string("city"),
         ];
         let mut atree = ATree::new(&definitions).unwrap();
-        atree.insert(1u64, "private").unwrap();
-        atree.insert(2u64, "not private").unwrap();
+        atree.insert(&1u64, "private").unwrap();
+        atree.insert(&2u64, "not private").unwrap();
         let mut builder = atree.make_event();
         builder.with_boolean("private", true).unwrap();
         let event = builder.build().unwrap();
@@ -1004,9 +1005,9 @@ mod tests {
         ];
         let mut atree = ATree::new(&definitions).unwrap();
 
-        atree.insert(1, A_COMPLEX_EXPRESSION).unwrap();
-        atree.insert(2, AN_EXPRESSION_WITH_AND_OPERATORS).unwrap();
-        atree.insert(3, AN_EXPRESSION_WITH_OR_OPERATORS).unwrap();
+        atree.insert(&1, A_COMPLEX_EXPRESSION).unwrap();
+        atree.insert(&2, AN_EXPRESSION_WITH_AND_OPERATORS).unwrap();
+        atree.insert(&3, AN_EXPRESSION_WITH_OR_OPERATORS).unwrap();
         let mut builder = atree.make_event();
         builder.with_integer("exchange_id", 1).unwrap();
         builder.with_boolean("private", true).unwrap();
@@ -1030,7 +1031,7 @@ mod tests {
     fn can_delete_a_single_predicate() {
         let definitions = [AttributeDefinition::boolean("private")];
         let mut atree = ATree::new(&definitions).unwrap();
-        atree.insert(1u64, "private").unwrap();
+        atree.insert(&1u64, "private").unwrap();
         let mut builder = atree.make_event();
         builder.with_boolean("private", true).unwrap();
         let event = builder.build().unwrap();
@@ -1061,8 +1062,8 @@ mod tests {
         let another_expression =
             r#"private or exchange_id = 1 or deal_ids one of ["deal-1", "deal-2"]"#;
         let mut atree = ATree::new(&definitions).unwrap();
-        atree.insert(1u64, an_expression).unwrap();
-        atree.insert(2u64, another_expression).unwrap();
+        atree.insert(&1u64, an_expression).unwrap();
+        atree.insert(&2u64, another_expression).unwrap();
         let mut builder = atree.make_event();
         builder.with_integer("exchange_id", 1).unwrap();
         let event = builder.build().unwrap();
@@ -1086,8 +1087,8 @@ mod tests {
         ];
         let an_expression = "private or exchange_id = 1";
         let mut atree = ATree::new(&definitions).unwrap();
-        atree.insert(1u64, an_expression).unwrap();
-        atree.insert(2u64, an_expression).unwrap();
+        atree.insert(&1u64, an_expression).unwrap();
+        atree.insert(&2u64, an_expression).unwrap();
         let mut builder = atree.make_event();
         builder.with_integer("exchange_id", 1).unwrap();
         let event = builder.build().unwrap();
@@ -1111,8 +1112,8 @@ mod tests {
         ];
         let an_expression = "private or exchange_id = 1";
         let mut atree = ATree::new(&definitions).unwrap();
-        atree.insert(1u64, an_expression).unwrap();
-        atree.insert(2u64, an_expression).unwrap();
+        atree.insert(&1u64, an_expression).unwrap();
+        atree.insert(&2u64, an_expression).unwrap();
         let mut builder = atree.make_event();
         builder.with_integer("exchange_id", 1).unwrap();
         let event = builder.build().unwrap();

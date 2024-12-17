@@ -77,7 +77,7 @@
 //!     * variable substitution/null checks/empty checks < set operations < lists operations
 //!     * the length of the lists has an impact on that cost too for set operations and lists
 //!       operations;
-//! * Evaluate the nodes lazily while searching.
+//! * Evaluate the predicates lazily while searching.
 mod ast;
 mod atree;
 mod error;

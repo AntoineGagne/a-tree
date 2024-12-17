@@ -1,7 +1,10 @@
 # a-tree
 
 [![Rust](https://github.com/AntoineGagne/a-tree/actions/workflows/check.yml/badge.svg)](https://github.com/AntoineGagne/a-tree/actions/workflows/check.yml)
-[![codecov](https://codecov.io/gh/AntoineGagne/a-tree/graph/badge.svg?token=JUKK1W5L2D)](https://codecov.io/gh/AntoineGagne/a-tree)
+[![Latest version](https://img.shields.io/crates/v/a-tree.svg)](https://crates.io/crates/a-tree)
+[![Documentation](https://docs.rs/a-tree/badge.svg)](https://docs.rs/a-tree)
+[![Code Coverage](https://codecov.io/gh/AntoineGagne/a-tree/graph/badge.svg?token=JUKK1W5L2D)](https://codecov.io/gh/AntoineGagne/a-tree)
+
 
 This is a work-in-progress implementation of the [A-Tree: A Dynamic Data Structure for Efficiently Indexing Arbitrary Boolean Expressions](https://dl.acm.org/doi/10.1145/3448016.3457266) paper.
 

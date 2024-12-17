@@ -9,6 +9,7 @@ use crate::{
 };
 use bimap::BiMap;
 use slab::Slab;
+use std::{collections::HashMap, hash::Hash};
 
 type NodeId = usize;
 type ExpressionId = u64;
@@ -27,9 +28,10 @@ pub struct ATree<T> {
     max_level: usize,
     predicates: Vec<NodeId>,
     expression_to_node: BiMap<ExpressionId, NodeId>,
+    nodes_by_ids: HashMap<T, NodeId>,
 }
 
-impl<T> ATree<T> {
+impl<T: Eq + Hash + Clone> ATree<T> {
     const DEFAULT_PREDICATES: usize = 1000;
     const DEFAULT_NODES: usize = 2000;
     const DEFAULT_ROOTS: usize = 50;
@@ -73,6 +75,7 @@ impl<T> ATree<T> {
             predicates: Vec::with_capacity(Self::DEFAULT_PREDICATES),
             nodes: Slab::with_capacity(Self::DEFAULT_NODES),
             expression_to_node: BiMap::new(),
+            nodes_by_ids: HashMap::new(),
         })
     }
 
@@ -101,7 +104,7 @@ impl<T> ATree<T> {
     fn insert_root(&mut self, user_id: T, root: Node) {
         let expression_id = root.id();
         if let Some(node_id) = self.expression_to_node.get_by_left(&expression_id) {
-            add_user_id(user_id, *node_id, &mut self.nodes);
+            add_user_id(&user_id, *node_id, &mut self.nodes, &mut self.nodes_by_ids);
             increment_use_count(*node_id, &mut self.nodes);
             return;
         }
@@ -123,7 +126,7 @@ impl<T> ATree<T> {
                     &mut self.nodes,
                     &expression_id,
                     rnode,
-                    Some(user_id),
+                    Some(user_id.clone()),
                 );
                 add_parent(&mut self.nodes[left_id], node_id);
                 add_parent(&mut self.nodes[right_id], node_id);
@@ -142,7 +145,7 @@ impl<T> ATree<T> {
                     &mut self.nodes,
                     &expression_id,
                     rnode,
-                    Some(user_id),
+                    Some(user_id.clone()),
                 );
                 add_parent(&mut self.nodes[child_id], node_id);
                 node_id
@@ -154,12 +157,13 @@ impl<T> ATree<T> {
                     &mut self.nodes,
                     &expression_id,
                     lnode,
-                    Some(user_id),
+                    Some(user_id.clone()),
                 );
                 self.predicates.push(node_id);
                 node_id
             }
         };
+        self.nodes_by_ids.insert(user_id, node_id);
         self.roots.push(node_id);
         self.max_level = get_max_level(&self.roots, &self.nodes);
     }
@@ -167,6 +171,7 @@ impl<T> ATree<T> {
     fn insert_node(&mut self, node: Node) -> NodeId {
         let expression_id = node.id();
         if let Some(node_id) = self.expression_to_node.get_by_left(&expression_id) {
+            change_rnode_to_inode(*node_id, &mut self.nodes);
             increment_use_count(*node_id, &mut self.nodes);
             return *node_id;
         }
@@ -268,7 +273,7 @@ impl<T> ATree<T> {
                 }
 
                 let entry = &self.nodes[node_id];
-                if entry.is_root() {
+                if !entry.user_ids.is_empty() {
                     if let Some(true) = result {
                         for user_id in &entry.user_ids {
                             matches.push(user_id);
@@ -288,6 +293,64 @@ impl<T> ATree<T> {
 
         Ok(Report::new(matches))
     }
+
+    #[inline]
+    pub fn delete(&mut self, id: &T) {
+        if let Some(node_id) = self.nodes_by_ids.get(id) {
+            self.delete_node(id, *node_id);
+        }
+    }
+
+    #[inline]
+    fn delete_node(&mut self, user_id: &T, node_id: NodeId) {
+        let children = decrement_use_count(
+            user_id,
+            node_id,
+            &mut self.nodes,
+            &mut self.expression_to_node,
+            &mut self.roots,
+            &mut self.predicates,
+            &mut self.nodes_by_ids,
+            &mut self.max_level,
+        );
+
+        if let Some(children) = children {
+            for child in children {
+                self.delete_node(user_id, child);
+            }
+        }
+    }
+}
+
+#[inline]
+#[allow(clippy::too_many_arguments)]
+fn decrement_use_count<T: Eq + Hash>(
+    user_id: &T,
+    node_id: NodeId,
+    nodes: &mut Slab<Entry<T>>,
+    expression_to_node: &mut BiMap<ExpressionId, NodeId>,
+    roots: &mut Vec<NodeId>,
+    predicates: &mut Vec<NodeId>,
+    nodes_by_ids: &mut HashMap<T, NodeId>,
+    max_level: &mut usize,
+) -> Option<Vec<NodeId>> {
+    let node = &mut nodes[node_id];
+    node.use_count -= 1;
+    let mut children = None;
+    node.user_ids.retain(|x| *x != *user_id);
+    nodes_by_ids.remove(user_id);
+    if node.use_count == 0 {
+        if !node.is_leaf() {
+            children = Some(node.children().to_vec());
+        }
+        roots.retain(|x| *x != node_id);
+        predicates.retain(|x| *x != node_id);
+        *max_level = get_max_level(roots, nodes);
+        expression_to_node.remove_by_right(&node_id);
+        nodes.remove(node_id);
+    }
+
+    children
 }
 
 #[inline]
@@ -312,8 +375,14 @@ fn add_parent<T>(entry: &mut Entry<T>, node_id: NodeId) {
 }
 
 #[inline]
-fn add_user_id<T>(user_id: T, node_id: NodeId, nodes: &mut Slab<Entry<T>>) {
-    nodes[node_id].user_ids.push(user_id);
+fn add_user_id<T: Eq + Hash + Clone>(
+    user_id: &T,
+    node_id: NodeId,
+    nodes: &mut Slab<Entry<T>>,
+    nodes_by_ids: &mut HashMap<T, NodeId>,
+) {
+    nodes[node_id].user_ids.push(user_id.clone());
+    nodes_by_ids.insert(user_id.clone(), node_id);
 }
 
 #[inline]
@@ -328,6 +397,25 @@ fn get_max_level<T>(roots: &[NodeId], nodes: &Slab<Entry<T>>) -> usize {
         .map(|root_id| nodes[*root_id].level())
         .max()
         .unwrap_or(1)
+}
+
+#[inline]
+fn change_rnode_to_inode<T>(node_id: NodeId, nodes: &mut Slab<Entry<T>>) {
+    let entry = &mut nodes[node_id];
+    if let ATreeNode::RNode(RNode {
+        children,
+        level,
+        operator,
+    }) = &entry.node
+    {
+        let inode = ATreeNode::INode(INode {
+            parents: vec![],
+            children: children.to_vec(),
+            level: *level,
+            operator: operator.clone(),
+        });
+        entry.node = inode;
+    }
 }
 
 #[inline]
@@ -451,6 +539,11 @@ impl<T> Entry<T> {
     }
 
     #[inline]
+    const fn is_leaf(&self) -> bool {
+        matches!(self.node, ATreeNode::LNode(_))
+    }
+
+    #[inline]
     const fn level(&self) -> usize {
         self.node.level()
     }
@@ -458,11 +551,6 @@ impl<T> Entry<T> {
     #[inline]
     fn evaluate(&self, event: &Event) -> Option<bool> {
         self.node.evaluate(event)
-    }
-
-    #[inline]
-    const fn is_root(&self) -> bool {
-        self.node.is_root()
     }
 
     #[inline]
@@ -514,11 +602,6 @@ impl ATreeNode {
             Self::LNode(node) => node.predicate.evaluate(event),
             node => unreachable!("evaluating {node:?} which is not a predicate; this is a bug."),
         }
-    }
-
-    #[inline]
-    const fn is_root(&self) -> bool {
-        matches!(self, Self::RNode(_))
     }
 
     #[inline]
@@ -705,6 +788,21 @@ mod tests {
         let result = atree.insert(1u64, AN_EXPRESSION);
 
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn can_insert_an_expression_that_refers_to_a_rnode() {
+        let definitions = [
+            AttributeDefinition::boolean("private"),
+            AttributeDefinition::integer("exchange_id"),
+            AttributeDefinition::string_list("deal_ids"),
+        ];
+        let an_expression = "private or exchange_id = 1";
+        let another_expression =
+            r#"private or exchange_id = 1 or deal_ids one of ["deal-1", "deal-2"]"#;
+        let mut atree = ATree::new(&definitions).unwrap();
+        assert!(atree.insert(1u64, an_expression).is_ok());
+        assert!(atree.insert(2u64, another_expression).is_ok());
     }
 
     #[test]
@@ -926,5 +1024,109 @@ mod tests {
         let mut actual = atree.search(event).unwrap().matches().to_vec();
         actual.sort();
         assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn can_delete_a_single_predicate() {
+        let definitions = [AttributeDefinition::boolean("private")];
+        let mut atree = ATree::new(&definitions).unwrap();
+        atree.insert(1u64, "private").unwrap();
+        let mut builder = atree.make_event();
+        builder.with_boolean("private", true).unwrap();
+        let event = builder.build().unwrap();
+
+        let results = atree.search(event).unwrap().matches().to_vec();
+        assert_eq!(vec![&1u64], results);
+
+        atree.delete(&1u64);
+        let mut builder = atree.make_event();
+        builder.with_boolean("private", true).unwrap();
+        let event = builder.build().unwrap();
+        let results = atree.search(event).unwrap().matches().to_vec();
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn deleting_an_expression_only_removes_the_id_not_the_expression_if_it_is_still_referenced() {
+        let definitions = [
+            AttributeDefinition::boolean("private"),
+            AttributeDefinition::integer("exchange_id"),
+            AttributeDefinition::string_list("deal_ids"),
+            AttributeDefinition::string_list("deals"),
+            AttributeDefinition::integer_list("segment_ids"),
+            AttributeDefinition::string("country"),
+            AttributeDefinition::string("city"),
+        ];
+        let an_expression = "private or exchange_id = 1";
+        let another_expression =
+            r#"private or exchange_id = 1 or deal_ids one of ["deal-1", "deal-2"]"#;
+        let mut atree = ATree::new(&definitions).unwrap();
+        atree.insert(1u64, an_expression).unwrap();
+        atree.insert(2u64, another_expression).unwrap();
+        let mut builder = atree.make_event();
+        builder.with_integer("exchange_id", 1).unwrap();
+        let event = builder.build().unwrap();
+
+        let results = atree.search(event).unwrap().matches().to_vec();
+        assert_eq!(vec![&1u64, &2u64], results);
+
+        atree.delete(&1u64);
+        let mut builder = atree.make_event();
+        builder.with_integer("exchange_id", 1).unwrap();
+        let event = builder.build().unwrap();
+        let results = atree.search(event).unwrap().matches().to_vec();
+        assert_eq!(vec![&2u64], results);
+    }
+
+    #[test]
+    fn deleting_an_expression_only_removes_the_id_not_the_expression_if_it_has_multiple_user_ids() {
+        let definitions = [
+            AttributeDefinition::boolean("private"),
+            AttributeDefinition::integer("exchange_id"),
+        ];
+        let an_expression = "private or exchange_id = 1";
+        let mut atree = ATree::new(&definitions).unwrap();
+        atree.insert(1u64, an_expression).unwrap();
+        atree.insert(2u64, an_expression).unwrap();
+        let mut builder = atree.make_event();
+        builder.with_integer("exchange_id", 1).unwrap();
+        let event = builder.build().unwrap();
+
+        let results = atree.search(event).unwrap().matches().to_vec();
+        assert_eq!(vec![&1u64, &2u64], results);
+
+        atree.delete(&1u64);
+        let mut builder = atree.make_event();
+        builder.with_integer("exchange_id", 1).unwrap();
+        let event = builder.build().unwrap();
+        let results = atree.search(event).unwrap().matches().to_vec();
+        assert_eq!(vec![&2u64], results);
+    }
+
+    #[test]
+    fn can_delete_root_node_when_all_references_are_deleted() {
+        let definitions = [
+            AttributeDefinition::boolean("private"),
+            AttributeDefinition::integer("exchange_id"),
+        ];
+        let an_expression = "private or exchange_id = 1";
+        let mut atree = ATree::new(&definitions).unwrap();
+        atree.insert(1u64, an_expression).unwrap();
+        atree.insert(2u64, an_expression).unwrap();
+        let mut builder = atree.make_event();
+        builder.with_integer("exchange_id", 1).unwrap();
+        let event = builder.build().unwrap();
+
+        let results = atree.search(event).unwrap().matches().to_vec();
+        assert_eq!(vec![&1u64, &2u64], results);
+
+        atree.delete(&1u64);
+        atree.delete(&2u64);
+        print!("{atree:#?}");
+        let mut builder = atree.make_event();
+        builder.with_integer("exchange_id", 1).unwrap();
+        let event = builder.build().unwrap();
+        let results = atree.search(event).unwrap().matches().to_vec();
+        assert!(results.is_empty());
     }
 }

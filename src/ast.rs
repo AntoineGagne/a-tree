@@ -29,13 +29,22 @@ impl Node {
         // (C ∧ D) ∨ A
         //
         // Then, given the above expressions, there could be a conflict in the expression IDs.
-        // If this is possible, should this implementation be switch for a commutative hashing
+        // If this is possible, should this implementation be switched for a commutative hashing
         // strategy?
         match self {
             Self::And(left, right) => u64::wrapping_mul(left.id(), right.id()),
             Self::Or(left, right) => u64::wrapping_add(left.id(), right.id()),
             Self::Not(node) => !node.id(),
             Self::Value(node) => node.id(),
+        }
+    }
+
+    #[inline]
+    pub fn cost(&self) -> u64 {
+        match self {
+            Self::And(left, right) | Self::Or(left, right) => left.cost() + right.cost(),
+            Self::Not(node) => node.cost(),
+            Self::Value(node) => node.cost(),
         }
     }
 }

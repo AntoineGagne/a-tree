@@ -37,6 +37,11 @@ impl Predicate {
         hasher.finish()
     }
 
+    #[inline]
+    pub fn cost(&self) -> u64 {
+        self.kind.cost()
+    }
+
     pub fn evaluate(&self, event: &Event) -> Option<bool> {
         let value = &event[self.attribute];
         match (&self.kind, value) {
@@ -105,6 +110,29 @@ pub enum PredicateKind {
     Equality(EqualityOperator, PrimitiveLiteral),
     List(ListOperator, ListLiteral),
     Null(NullOperator),
+}
+
+impl PredicateKind {
+    const CONSTANT_COST: u64 = 0;
+    const LOGARITHMIC_COST: u64 = 1;
+    const LIST_COST: u64 = 2;
+
+    #[inline]
+    pub fn cost(&self) -> u64 {
+        match self {
+            Self::Variable | Self::Null(_) | Self::Comparison(_, _) | Self::Equality(_, _) => {
+                Self::CONSTANT_COST
+            }
+            Self::Set(_, ListLiteral::StringList(list)) => {
+                Self::LOGARITHMIC_COST * (list.len() as u64)
+            }
+            Self::Set(_, ListLiteral::IntegerList(list)) => {
+                Self::LOGARITHMIC_COST * (list.len() as u64)
+            }
+            Self::List(_, ListLiteral::StringList(list)) => Self::LIST_COST * (list.len() as u64),
+            Self::List(_, ListLiteral::IntegerList(list)) => Self::LIST_COST * (list.len() as u64),
+        }
+    }
 }
 
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]

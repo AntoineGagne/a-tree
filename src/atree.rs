@@ -94,6 +94,7 @@ impl<T: Eq + Hash + Clone> ATree<T> {
     /// assert!(atree.insert(&1u64, "exchange_id = 5").is_ok());
     /// assert!(atree.insert(&2u64, "private").is_ok());
     /// ```
+    #[inline]
     pub fn insert<'a>(&'a mut self, user_id: &T, abe: &'a str) -> Result<(), ATreeError<'a>> {
         let ast = parser::parse(abe, &self.attributes, &mut self.strings)
             .map_err(ATreeError::ParseError)?;

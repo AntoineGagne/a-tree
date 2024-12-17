@@ -25,7 +25,7 @@
 //! ];
 //! let mut mappings: HashMap<u64, &str> = HashMap::new();
 //! for (id, expression) in &expressions_by_ids {
-//!     atree.insert(*id, expression).unwrap();
+//!     atree.insert(id, expression).unwrap();
 //!     mappings.insert(*id, expression);
 //! }
 //!

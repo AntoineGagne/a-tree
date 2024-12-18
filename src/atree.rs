@@ -1173,7 +1173,6 @@ mod tests {
 
         atree.delete(&1u64);
         atree.delete(&2u64);
-        print!("{atree:#?}");
         let mut builder = atree.make_event();
         builder.with_integer("exchange_id", 1).unwrap();
         let event = builder.build().unwrap();

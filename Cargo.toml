@@ -35,7 +35,6 @@ harness = false
 lalrpop = "0.22.0"
 
 [dependencies]
-bimap = "0.6"
 itertools = "0.13"
 lalrpop-util = { version = "0.22.0", features = ["lexer", "unicode"] }
 logos = "0.15"

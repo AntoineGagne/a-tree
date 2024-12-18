@@ -7,7 +7,6 @@ use crate::{
     predicates::Predicate,
     strings::StringTable,
 };
-use bimap::BiMap;
 use slab::Slab;
 use std::{collections::HashMap, hash::Hash};
 
@@ -27,7 +26,7 @@ pub struct ATree<T> {
     roots: Vec<NodeId>,
     max_level: usize,
     predicates: Vec<NodeId>,
-    expression_to_node: BiMap<ExpressionId, NodeId>,
+    expression_to_node: HashMap<ExpressionId, NodeId>,
     nodes_by_ids: HashMap<T, NodeId>,
 }
 
@@ -74,7 +73,7 @@ impl<T: Eq + Hash + Clone> ATree<T> {
             roots: Vec::with_capacity(Self::DEFAULT_ROOTS),
             predicates: Vec::with_capacity(Self::DEFAULT_PREDICATES),
             nodes: Slab::with_capacity(Self::DEFAULT_NODES),
-            expression_to_node: BiMap::new(),
+            expression_to_node: HashMap::new(),
             nodes_by_ids: HashMap::new(),
         })
     }
@@ -104,7 +103,7 @@ impl<T: Eq + Hash + Clone> ATree<T> {
 
     fn insert_root(&mut self, user_id: &T, root: Node) {
         let expression_id = root.id();
-        if let Some(node_id) = self.expression_to_node.get_by_left(&expression_id) {
+        if let Some(node_id) = self.expression_to_node.get(&expression_id) {
             add_user_id(user_id, *node_id, &mut self.nodes, &mut self.nodes_by_ids);
             increment_use_count(*node_id, &mut self.nodes);
             return;
@@ -179,7 +178,7 @@ impl<T: Eq + Hash + Clone> ATree<T> {
 
     fn insert_node(&mut self, node: Node) -> NodeId {
         let expression_id = node.id();
-        if let Some(node_id) = self.expression_to_node.get_by_left(&expression_id) {
+        if let Some(node_id) = self.expression_to_node.get(&expression_id) {
             change_rnode_to_inode(*node_id, &mut self.nodes);
             increment_use_count(*node_id, &mut self.nodes);
             return *node_id;
@@ -346,7 +345,7 @@ fn decrement_use_count<T: Eq + Hash>(
     user_id: &T,
     node_id: NodeId,
     nodes: &mut Slab<Entry<T>>,
-    expression_to_node: &mut BiMap<ExpressionId, NodeId>,
+    expression_to_node: &mut HashMap<ExpressionId, NodeId>,
     roots: &mut Vec<NodeId>,
     predicates: &mut Vec<NodeId>,
     nodes_by_ids: &mut HashMap<T, NodeId>,
@@ -361,10 +360,11 @@ fn decrement_use_count<T: Eq + Hash>(
         if !node.is_leaf() {
             children = Some(node.children().to_vec());
         }
+        let expression_id = node.id;
         roots.retain(|x| *x != node_id);
         predicates.retain(|x| *x != node_id);
         *max_level = get_max_level(roots, nodes);
-        expression_to_node.remove_by_right(&node_id);
+        expression_to_node.remove(&expression_id);
         nodes.remove(node_id);
     }
 
@@ -373,7 +373,7 @@ fn decrement_use_count<T: Eq + Hash>(
 
 #[inline]
 fn insert_node<T>(
-    expression_to_node: &mut BiMap<ExpressionId, NodeId>,
+    expression_to_node: &mut HashMap<ExpressionId, NodeId>,
     nodes: &mut Slab<Entry<T>>,
     expression_id: &ExpressionId,
     node: ATreeNode,
@@ -382,9 +382,9 @@ fn insert_node<T>(
 ) -> NodeId {
     let entry = Entry::new(*expression_id, node, user_id, cost);
     let node_id = nodes.insert(entry);
-    expression_to_node
-        .insert_no_overwrite(*expression_id, node_id)
-        .unwrap_or_else(|_| panic!("{expression_id} is already present; this is a bug"));
+    if !expression_to_node.insert(*expression_id, node_id).is_none() {
+        panic!("{expression_id} is already present; this is a bug");
+    }
     node_id
 }
 

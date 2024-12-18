@@ -448,8 +448,8 @@ fn process_predicates<'a, T>(
 ) {
     for predicate_id in predicates {
         let node = &nodes[*predicate_id];
-        // There is no point in delaying the evaluation of those predicates since they need to be
-        // evaluated since they count against the top level expressions
+        // There is no point in delaying the evaluation of those predicates
+        // since they count against the top level expressions
         if !node.user_ids.is_empty() {
             let result = node.evaluate(event);
             results.set_result(*predicate_id, result);

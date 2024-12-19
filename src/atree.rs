@@ -300,8 +300,17 @@ impl<T: Eq + Hash + Clone> ATree<T> {
                 }
 
                 for parent_id in entry.parents() {
-                    if !results.is_evaluated(*parent_id) {
-                        let entry = &self.nodes[*parent_id];
+                    let entry = &self.nodes[*parent_id];
+                    let is_evaluated = results.is_evaluated(*parent_id);
+                    if !is_evaluated
+                        && matches!(entry.operator(), Operator::And)
+                        && result.unwrap_or(false)
+                    {
+                        queues[entry.level() - 2].push((*parent_id, entry));
+                        continue;
+                    }
+
+                    if !is_evaluated {
                         queues[entry.level() - 2].push((*parent_id, entry));
                     }
                 }
@@ -527,12 +536,12 @@ fn process_predicates<'a, T>(
 ) {
     for predicate_id in predicates {
         let node = &nodes[*predicate_id];
+        let result = node.evaluate(event);
+        results.set_result(*predicate_id, result);
+
         // There is no point in delaying the evaluation of those predicates
         // since they count against the top level expressions
         if !node.user_ids.is_empty() {
-            let result = node.evaluate(event);
-            results.set_result(*predicate_id, result);
-
             if let Some(true) = result {
                 for user_id in &node.user_ids {
                     matches.push(user_id);
@@ -544,7 +553,11 @@ fn process_predicates<'a, T>(
             .iter()
             .map(|parent_id| (*parent_id, &nodes[*parent_id]))
             .for_each(|(parent_id, parent)| {
-                queues[parent.level() - 2].push((parent_id, parent));
+                if !matches!(parent.operator(), Operator::And) || result.unwrap_or(false) {
+                    queues[parent.level() - 2].push((parent_id, parent));
+                } else {
+                    results.set_result(parent_id, Some(false));
+                }
             })
     }
 }

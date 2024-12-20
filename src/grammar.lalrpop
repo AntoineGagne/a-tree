@@ -26,7 +26,6 @@ Expression: ast::Node = {
         ast::Node::Or(Box::new(left), Box::new(right))
     },
     #[precedence(level="1")]
-    "(" <expression:Expression> ")" => expression,
     NumericExpression,
     #[precedence(level="1")]
     EqualityExpression,
@@ -39,6 +38,8 @@ Expression: ast::Node = {
     #[precedence(level="1")]
     "not" <expression:Expression> => ast::Node::Not(Box::new(expression)),
     #[precedence(level="0")]
+    "(" <expression:ExpressionReset> ")" => expression,
+    #[precedence(level="0")]
     <variable:"identifier"> =>?
         predicates::Predicate::new(
             attributes,
@@ -46,6 +47,10 @@ Expression: ast::Node = {
             predicates::PredicateKind::Variable
         ).map(ast::Node::Value).map_err(|error| ParseError::User { error: ParserError::Event(error) })
     ,
+}
+
+ExpressionReset: ast::Node = {
+    <Expression>,
 }
 
 NumericExpression: ast::Node = {

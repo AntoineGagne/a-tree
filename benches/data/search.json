@@ -29,6 +29,27 @@
         4001,
         4002
       ]
+    },
+    {
+      "city": "QC",
+      "country": "CA",
+      "deals": [
+        "deal-50",
+        "deal-52",
+        "deal-53"
+      ],
+      "exchange_id": 1,
+      "genres": [
+        "action",
+        "games",
+        "books"
+      ],
+      "private": true,
+      "segment_ids": [
+        5000,
+        5001,
+        5002
+      ]
     }
   ],
   "expressions": [

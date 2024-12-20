@@ -890,6 +890,46 @@ mod tests {
         );
     }
 
+    #[test]
+    fn can_parse_an_expression_with_multiple_parenthesis_levels() {
+        let mut strings = StringTable::new();
+        let attributes = define_attributes();
+
+        let parsed = parse(
+            r##"((private and (exchange_id = 1) and (deal_ids one of ["deal-1", "deal-2"])) or (private and (exchange_id = 2) and (deal_ids one of ["deal-3", "deal-4"])))"##,
+            &attributes,
+            &mut strings,
+        );
+
+        assert_eq!(
+            Ok(or!(
+                and!(
+                    and!(
+                        value!(variable!(&attributes, "private")),
+                        value!(equal!(&attributes, "exchange_id", primitive_integer!(1)))
+                    ),
+                    value!(one_of!(
+                        &attributes,
+                        "deal_ids",
+                        string_list!(vec![strings.get("deal-1"), strings.get("deal-2")])
+                    ))
+                ),
+                and!(
+                    and!(
+                        value!(variable!(&attributes, "private")),
+                        value!(equal!(&attributes, "exchange_id", primitive_integer!(2)))
+                    ),
+                    value!(one_of!(
+                        &attributes,
+                        "deal_ids",
+                        string_list!(vec![strings.get("deal-3"), strings.get("deal-4")])
+                    ))
+                )
+            )),
+            parsed
+        );
+    }
+
     fn define_attributes() -> AttributeTable {
         let definitions = vec![
             AttributeDefinition::string_list("deals"),

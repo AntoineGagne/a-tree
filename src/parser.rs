@@ -386,6 +386,26 @@ mod tests {
     }
 
     #[test]
+    fn can_parse_is_not_empty_expression() {
+        let mut strings = StringTable::new();
+        let attributes = define_attributes();
+
+        let parsed = parse("deals is not empty", &attributes, &mut strings);
+
+        assert_eq!(
+            Ok(Node::Value(
+                Predicate::new(
+                    &attributes,
+                    "deals",
+                    PredicateKind::Null(NullOperator::IsNotEmpty)
+                )
+                .unwrap()
+            )),
+            parsed
+        );
+    }
+
+    #[test]
     fn return_an_error_on_an_empty_list() {
         let mut strings = StringTable::new();
         let attributes = define_attributes();

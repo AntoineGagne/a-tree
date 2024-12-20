@@ -3,7 +3,10 @@ use crate::{
     strings::StringId,
 };
 use rust_decimal::Decimal;
-use std::hash::{Hash, Hasher};
+use std::{
+    hash::{Hash, Hasher},
+    ops::Not,
+};
 
 #[derive(Eq, PartialEq, Hash, Debug, Clone)]
 pub struct Predicate {
@@ -48,6 +51,7 @@ impl Predicate {
             (PredicateKind::Null(operator), value) => Some(operator.evaluate(value)),
             (_, AttributeValue::Undefined) => None,
             (PredicateKind::Variable, AttributeValue::Boolean(value)) => Some(*value),
+            (PredicateKind::NegatedVariable, AttributeValue::Boolean(value)) => Some(!*value),
             (PredicateKind::Set(operator, haystack), needle) => {
                 Some(operator.evaluate(haystack, needle))
             }
@@ -57,6 +61,17 @@ impl Predicate {
             (kind, value) => {
                 unreachable!("Invalid => got: {kind:?} with {value:?}");
             }
+        }
+    }
+}
+
+impl Not for Predicate {
+    type Output = Self;
+
+    fn not(self) -> Self::Output {
+        Self {
+            attribute: self.attribute,
+            kind: !self.kind,
         }
     }
 }
@@ -85,15 +100,20 @@ fn validate_predicate(
         (PredicateKind::List(_, ListLiteral::StringList(_)), AttributeKind::StringList) => Ok(()),
 
         (PredicateKind::Variable, AttributeKind::Boolean) => Ok(()),
+        (PredicateKind::NegatedVariable, AttributeKind::Boolean) => Ok(()),
 
         (PredicateKind::Null(NullOperator::IsEmpty), AttributeKind::StringList) => Ok(()),
         (PredicateKind::Null(NullOperator::IsEmpty), AttributeKind::IntegerList) => Ok(()),
+        (PredicateKind::Null(NullOperator::IsNotEmpty), AttributeKind::StringList) => Ok(()),
+        (PredicateKind::Null(NullOperator::IsNotEmpty), AttributeKind::IntegerList) => Ok(()),
         (PredicateKind::Null(NullOperator::IsNull), AttributeKind::Integer) => Ok(()),
         (PredicateKind::Null(NullOperator::IsNull), AttributeKind::Float) => Ok(()),
         (PredicateKind::Null(NullOperator::IsNull), AttributeKind::String) => Ok(()),
+        (PredicateKind::Null(NullOperator::IsNull), AttributeKind::Boolean) => Ok(()),
         (PredicateKind::Null(NullOperator::IsNotNull), AttributeKind::Integer) => Ok(()),
         (PredicateKind::Null(NullOperator::IsNotNull), AttributeKind::Float) => Ok(()),
         (PredicateKind::Null(NullOperator::IsNotNull), AttributeKind::String) => Ok(()),
+        (PredicateKind::Null(NullOperator::IsNotNull), AttributeKind::Boolean) => Ok(()),
         (actual, expected) => Err(EventError::MismatchingTypes {
             name: name.to_string(),
             expected: expected.clone(),
@@ -105,6 +125,7 @@ fn validate_predicate(
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]
 pub enum PredicateKind {
     Variable,
+    NegatedVariable,
     Set(SetOperator, ListLiteral),
     Comparison(ComparisonOperator, ComparisonValue),
     Equality(EqualityOperator, PrimitiveLiteral),
@@ -120,9 +141,11 @@ impl PredicateKind {
     #[inline]
     pub fn cost(&self) -> u64 {
         match self {
-            Self::Variable | Self::Null(_) | Self::Comparison(_, _) | Self::Equality(_, _) => {
-                Self::CONSTANT_COST
-            }
+            Self::NegatedVariable
+            | Self::Variable
+            | Self::Null(_)
+            | Self::Comparison(_, _)
+            | Self::Equality(_, _) => Self::CONSTANT_COST,
             Self::Set(_, ListLiteral::StringList(list)) => {
                 Self::LOGARITHMIC_COST * (list.len() as u64)
             }
@@ -131,6 +154,45 @@ impl PredicateKind {
             }
             Self::List(_, ListLiteral::StringList(list)) => Self::LIST_COST * (list.len() as u64),
             Self::List(_, ListLiteral::IntegerList(list)) => Self::LIST_COST * (list.len() as u64),
+        }
+    }
+}
+
+impl Not for PredicateKind {
+    type Output = Self;
+
+    fn not(self) -> Self {
+        match self {
+            Self::Set(SetOperator::In, value) => Self::Set(SetOperator::NotIn, value),
+            Self::Set(SetOperator::NotIn, value) => Self::Set(SetOperator::In, value),
+            Self::Comparison(ComparisonOperator::LessThan, value) => {
+                Self::Comparison(ComparisonOperator::GreaterThanEqual, value)
+            }
+            Self::Comparison(ComparisonOperator::LessThanEqual, value) => {
+                Self::Comparison(ComparisonOperator::GreaterThan, value)
+            }
+            Self::Comparison(ComparisonOperator::GreaterThan, value) => {
+                Self::Comparison(ComparisonOperator::LessThanEqual, value)
+            }
+            Self::Comparison(ComparisonOperator::GreaterThanEqual, value) => {
+                Self::Comparison(ComparisonOperator::LessThan, value)
+            }
+            Self::Null(NullOperator::IsNull) => Self::Null(NullOperator::IsNotNull),
+            Self::Null(NullOperator::IsNotNull) => Self::Null(NullOperator::IsNull),
+            Self::Null(NullOperator::IsEmpty) => Self::Null(NullOperator::IsNotEmpty),
+            Self::Null(NullOperator::IsNotEmpty) => Self::Null(NullOperator::IsEmpty),
+            Self::Equality(EqualityOperator::Equal, value) => {
+                Self::Equality(EqualityOperator::NotEqual, value)
+            }
+            Self::Equality(EqualityOperator::NotEqual, value) => {
+                Self::Equality(EqualityOperator::Equal, value)
+            }
+            Self::List(ListOperator::OneOf, value) => Self::List(ListOperator::NoneOf, value),
+            Self::List(ListOperator::AllOf, value) => Self::List(ListOperator::NotAllOf, value),
+            Self::List(ListOperator::NotAllOf, value) => Self::List(ListOperator::AllOf, value),
+            Self::List(ListOperator::NoneOf, value) => Self::List(ListOperator::OneOf, value),
+            Self::Variable => Self::NegatedVariable,
+            Self::NegatedVariable => Self::Variable,
         }
     }
 }
@@ -231,6 +293,9 @@ pub enum ListOperator {
     OneOf,
     NoneOf,
     AllOf,
+    // This is an internal operator only This is only to achieve symmetry with
+    // the `all_of` operator for the zero suppression filter.
+    NotAllOf,
 }
 
 impl ListOperator {
@@ -253,10 +318,12 @@ impl ListOperator {
             Self::OneOf => one_of(left, right),
             Self::NoneOf => none_of(left, right),
             Self::AllOf => all_of(left, right),
+            Self::NotAllOf => not_all_of(left, right),
         }
     }
 }
 
+#[inline]
 fn none_of<T: Ord>(left: &[T], right: &[T]) -> bool {
     !one_of(left, right)
 }
@@ -287,6 +354,11 @@ fn one_of<T: Ord>(left: &[T], right: &[T]) -> bool {
     }
 
     false
+}
+
+#[inline]
+fn not_all_of<T: Ord>(left: &[T], right: &[T]) -> bool {
+    !all_of(left, right)
 }
 
 fn all_of<T: Ord>(left: &[T], right: &[T]) -> bool {
@@ -324,6 +396,7 @@ pub enum NullOperator {
     IsNull,
     IsNotNull,
     IsEmpty,
+    IsNotEmpty,
 }
 
 impl NullOperator {
@@ -332,15 +405,23 @@ impl NullOperator {
             (Self::IsNull, AttributeValue::Undefined) => true,
             (
                 Self::IsNull,
-                AttributeValue::Integer(_) | AttributeValue::String(_) | AttributeValue::Float(_),
+                AttributeValue::Integer(_)
+                | AttributeValue::String(_)
+                | AttributeValue::Float(_)
+                | AttributeValue::Boolean(_),
             ) => false,
             (Self::IsNotNull, AttributeValue::Undefined) => false,
             (
                 Self::IsNotNull,
-                AttributeValue::Integer(_) | AttributeValue::String(_) | AttributeValue::Float(_),
+                AttributeValue::Integer(_)
+                | AttributeValue::String(_)
+                | AttributeValue::Float(_)
+                | AttributeValue::Boolean(_),
             ) => true,
             (Self::IsEmpty, AttributeValue::StringList(list)) => list.is_empty(),
             (Self::IsEmpty, AttributeValue::IntegerList(list)) => list.is_empty(),
+            (Self::IsNotEmpty, AttributeValue::StringList(list)) => !list.is_empty(),
+            (Self::IsNotEmpty, AttributeValue::IntegerList(list)) => !list.is_empty(),
             (_, value) => {
                 unreachable!(
                     "Null check ({self:?}) for {value:?} should never happen. This is a bug."
@@ -369,6 +450,12 @@ mod tests {
     use crate::{
         events::{AttributeDefinition, AttributeTable, EventBuilder},
         strings::StringTable,
+        test_utils::predicates::{
+            all_of, comparison_float, comparison_integer, equal, greater_than, greater_than_equal,
+            integer_list, is_empty, is_not_empty, is_not_null, is_null, less_than, less_than_equal,
+            negated_variable, none_of, not_equal, one_of, predicate, primitive_string, set_in,
+            set_not_in, string_list, variable,
+        },
     };
     use itertools::Itertools;
     use proptest::prelude::{proptest, *};
@@ -384,7 +471,7 @@ mod tests {
         let mut builder = an_event_builder(&attributes, &strings);
         builder.with_boolean("private", true).unwrap();
         let event = builder.build().unwrap();
-        let predicate = Predicate::new(&attributes, "private", PredicateKind::Variable).unwrap();
+        let predicate = variable!(&attributes, "private");
 
         assert_eq!(Some(true), predicate.evaluate(&event));
     }
@@ -396,9 +483,33 @@ mod tests {
         let mut builder = an_event_builder(&attributes, &strings);
         builder.with_boolean("private", false).unwrap();
         let event = builder.build().unwrap();
-        let predicate = Predicate::new(&attributes, "private", PredicateKind::Variable).unwrap();
+        let predicate = variable!(&attributes, "private");
 
         assert_eq!(Some(false), predicate.evaluate(&event));
+    }
+
+    #[test]
+    fn return_false_on_negated_boolean_variable_that_is_true() {
+        let attributes = define_attributes();
+        let strings = StringTable::new();
+        let mut builder = an_event_builder(&attributes, &strings);
+        builder.with_boolean("private", true).unwrap();
+        let event = builder.build().unwrap();
+        let predicate = negated_variable!(&attributes, "private");
+
+        assert_eq!(Some(false), predicate.evaluate(&event));
+    }
+
+    #[test]
+    fn return_true_on_negated_boolean_variable_that_is_false() {
+        let attributes = define_attributes();
+        let strings = StringTable::new();
+        let mut builder = an_event_builder(&attributes, &strings);
+        builder.with_boolean("private", false).unwrap();
+        let event = builder.build().unwrap();
+        let predicate = negated_variable!(&attributes, "private");
+
+        assert_eq!(Some(true), predicate.evaluate(&event));
     }
 
     #[test]
@@ -406,12 +517,7 @@ mod tests {
         let attributes = define_attributes();
         let strings = StringTable::new();
         let event = an_event_builder(&attributes, &strings).build().unwrap();
-        let predicate = Predicate::new(
-            &attributes,
-            "country",
-            PredicateKind::Null(NullOperator::IsNull),
-        )
-        .unwrap();
+        let predicate = is_null!(&attributes, "country");
 
         assert_eq!(Some(false), predicate.evaluate(&event));
     }
@@ -423,12 +529,7 @@ mod tests {
         let mut builder = an_event_builder(&attributes, &strings);
         builder.with_undefined("country").unwrap();
         let event = builder.build().unwrap();
-        let predicate = Predicate::new(
-            &attributes,
-            "country",
-            PredicateKind::Null(NullOperator::IsNull),
-        )
-        .unwrap();
+        let predicate = is_null!(&attributes, "country");
 
         assert_eq!(Some(true), predicate.evaluate(&event));
     }
@@ -438,12 +539,7 @@ mod tests {
         let attributes = define_attributes();
         let strings = StringTable::new();
         let event = an_event_builder(&attributes, &strings).build().unwrap();
-        let predicate = Predicate::new(
-            &attributes,
-            "country",
-            PredicateKind::Null(NullOperator::IsNotNull),
-        )
-        .unwrap();
+        let predicate = is_not_null!(&attributes, "country");
 
         assert_eq!(Some(true), predicate.evaluate(&event));
     }
@@ -455,12 +551,7 @@ mod tests {
         let mut builder = an_event_builder(&attributes, &strings);
         builder.with_undefined("country").unwrap();
         let event = builder.build().unwrap();
-        let predicate = Predicate::new(
-            &attributes,
-            "country",
-            PredicateKind::Null(NullOperator::IsNotNull),
-        )
-        .unwrap();
+        let predicate = is_not_null!(&attributes, "country");
 
         assert_eq!(Some(false), predicate.evaluate(&event));
     }
@@ -472,12 +563,7 @@ mod tests {
         let mut builder = an_event_builder(&attributes, &strings);
         builder.with_integer_list("segment_ids", &[]).unwrap();
         let event = builder.build().unwrap();
-        let predicate = Predicate::new(
-            &attributes,
-            "segment_ids",
-            PredicateKind::Null(NullOperator::IsEmpty),
-        )
-        .unwrap();
+        let predicate = is_empty!(&attributes, "segment_ids");
 
         assert_eq!(Some(true), predicate.evaluate(&event));
     }
@@ -491,14 +577,35 @@ mod tests {
             .with_integer_list("segment_ids", &[1, 2, 3])
             .unwrap();
         let event = builder.build().unwrap();
-        let predicate = Predicate::new(
-            &attributes,
-            "segment_ids",
-            PredicateKind::Null(NullOperator::IsEmpty),
-        )
-        .unwrap();
+        let predicate = is_empty!(&attributes, "segment_ids");
 
         assert_eq!(Some(false), predicate.evaluate(&event));
+    }
+
+    #[test]
+    fn return_false_on_not_empty_check_for_empty_list_variable() {
+        let attributes = define_attributes();
+        let strings = StringTable::new();
+        let mut builder = an_event_builder(&attributes, &strings);
+        builder.with_integer_list("segment_ids", &[]).unwrap();
+        let event = builder.build().unwrap();
+        let predicate = is_not_empty!(&attributes, "segment_ids");
+
+        assert_eq!(Some(false), predicate.evaluate(&event));
+    }
+
+    #[test]
+    fn return_true_on_not_empty_check_for_non_empty_list_variable() {
+        let attributes = define_attributes();
+        let strings = StringTable::new();
+        let mut builder = an_event_builder(&attributes, &strings);
+        builder
+            .with_integer_list("segment_ids", &[1, 2, 3])
+            .unwrap();
+        let event = builder.build().unwrap();
+        let predicate = is_not_empty!(&attributes, "segment_ids");
+
+        assert_eq!(Some(true), predicate.evaluate(&event));
     }
 
     #[test]
@@ -508,12 +615,7 @@ mod tests {
         let mut builder = an_event_builder(&attributes, &strings);
         builder.with_integer("exchange_id", AN_EXCHANGE_ID).unwrap();
         let event = builder.build().unwrap();
-        let predicate = Predicate::new(
-            &attributes,
-            "exchange_id",
-            PredicateKind::Set(SetOperator::In, ListLiteral::IntegerList(vec![])),
-        )
-        .unwrap();
+        let predicate = set_in!(&attributes, "exchange_id", integer_list!(vec![]));
 
         assert_eq!(Some(false), predicate.evaluate(&event));
     }
@@ -525,15 +627,11 @@ mod tests {
         let mut builder = an_event_builder(&attributes, &strings);
         builder.with_integer("exchange_id", AN_EXCHANGE_ID).unwrap();
         let event = builder.build().unwrap();
-        let predicate = Predicate::new(
+        let predicate = set_in!(
             &attributes,
             "exchange_id",
-            PredicateKind::Set(
-                SetOperator::In,
-                ListLiteral::IntegerList((1..AN_EXCHANGE_ID).collect()),
-            ),
-        )
-        .unwrap();
+            integer_list!((1..AN_EXCHANGE_ID).collect())
+        );
 
         assert_eq!(Some(false), predicate.evaluate(&event));
     }
@@ -545,15 +643,11 @@ mod tests {
         let mut builder = an_event_builder(&attributes, &strings);
         builder.with_integer("exchange_id", AN_EXCHANGE_ID).unwrap();
         let event = builder.build().unwrap();
-        let predicate = Predicate::new(
+        let predicate = set_in!(
             &attributes,
             "exchange_id",
-            PredicateKind::Set(
-                SetOperator::In,
-                ListLiteral::IntegerList((1..=50).collect()),
-            ),
-        )
-        .unwrap();
+            integer_list!((1..=50).collect())
+        );
 
         assert_eq!(Some(true), predicate.evaluate(&event));
     }
@@ -583,15 +677,11 @@ mod tests {
         let mut builder = an_event_builder(&attributes, &strings);
         builder.with_integer("exchange_id", AN_EXCHANGE_ID).unwrap();
         let event = builder.build().unwrap();
-        let predicate = Predicate::new(
+        let predicate = set_not_in!(
             &attributes,
             "exchange_id",
-            PredicateKind::Set(
-                SetOperator::NotIn,
-                ListLiteral::IntegerList((1..AN_EXCHANGE_ID).collect()),
-            ),
-        )
-        .unwrap();
+            integer_list!((1..AN_EXCHANGE_ID).collect())
+        );
 
         assert_eq!(Some(true), predicate.evaluate(&event));
     }
@@ -604,15 +694,11 @@ mod tests {
         let mut builder = an_event_builder(&attributes, &strings);
         builder.with_integer("exchange_id", AN_EXCHANGE_ID).unwrap();
         let event = builder.build().unwrap();
-        let predicate = Predicate::new(
+        let predicate = set_not_in!(
             &attributes,
             "exchange_id",
-            PredicateKind::Set(
-                SetOperator::NotIn,
-                ListLiteral::IntegerList((1..=50).collect()),
-            ),
-        )
-        .unwrap();
+            integer_list!((1..=50).collect())
+        );
 
         assert_eq!(Some(false), predicate.evaluate(&event));
     }
@@ -625,12 +711,7 @@ mod tests {
         let mut builder = an_event_builder(&attributes, &strings);
         builder.with_string("country", A_COUNTRY).unwrap();
         let event = builder.build().unwrap();
-        let predicate = Predicate::new(
-            &attributes,
-            "country",
-            PredicateKind::Equality(EqualityOperator::Equal, PrimitiveLiteral::String(string_id)),
-        )
-        .unwrap();
+        let predicate = equal!(&attributes, "country", primitive_string!(string_id));
 
         assert_eq!(Some(true), predicate.evaluate(&event));
     }
@@ -644,15 +725,7 @@ mod tests {
         let mut builder = an_event_builder(&attributes, &strings);
         builder.with_string("country", A_COUNTRY).unwrap();
         let event = builder.build().unwrap();
-        let predicate = Predicate::new(
-            &attributes,
-            "country",
-            PredicateKind::Equality(
-                EqualityOperator::Equal,
-                PrimitiveLiteral::String(another_string_id),
-            ),
-        )
-        .unwrap();
+        let predicate = equal!(&attributes, "country", primitive_string!(another_string_id));
 
         assert_eq!(Some(false), predicate.evaluate(&event));
     }
@@ -665,15 +738,7 @@ mod tests {
         let mut builder = an_event_builder(&attributes, &strings);
         builder.with_string("country", A_COUNTRY).unwrap();
         let event = builder.build().unwrap();
-        let predicate = Predicate::new(
-            &attributes,
-            "country",
-            PredicateKind::Equality(
-                EqualityOperator::NotEqual,
-                PrimitiveLiteral::String(string_id),
-            ),
-        )
-        .unwrap();
+        let predicate = not_equal!(&attributes, "country", primitive_string!(string_id));
 
         assert_eq!(Some(false), predicate.evaluate(&event));
     }
@@ -687,15 +752,7 @@ mod tests {
         let mut builder = an_event_builder(&attributes, &strings);
         builder.with_string("country", A_COUNTRY).unwrap();
         let event = builder.build().unwrap();
-        let predicate = Predicate::new(
-            &attributes,
-            "country",
-            PredicateKind::Equality(
-                EqualityOperator::NotEqual,
-                PrimitiveLiteral::String(another_string_id),
-            ),
-        )
-        .unwrap();
+        let predicate = not_equal!(&attributes, "country", primitive_string!(another_string_id));
 
         assert_eq!(Some(true), predicate.evaluate(&event));
     }
@@ -708,15 +765,11 @@ mod tests {
         builder.with_float("bidfloor", 55, 3).unwrap();
         let event = builder.build().unwrap();
 
-        let predicate = Predicate::new(
+        let predicate = less_than!(
             &attributes,
             "bidfloor",
-            PredicateKind::Comparison(
-                ComparisonOperator::LessThan,
-                ComparisonValue::Float(Decimal::new(2, 0)),
-            ),
-        )
-        .unwrap();
+            comparison_float!(Decimal::new(2, 0))
+        );
 
         assert_eq!(Some(true), predicate.evaluate(&event));
     }
@@ -730,15 +783,11 @@ mod tests {
         builder.with_float("bidfloor", 55, 3).unwrap();
         let event = builder.build().unwrap();
 
-        let predicate = Predicate::new(
+        let predicate = less_than_equal!(
             &attributes,
             "bidfloor",
-            PredicateKind::Comparison(
-                ComparisonOperator::LessThanEqual,
-                ComparisonValue::Float(Decimal::new(2, 0)),
-            ),
-        )
-        .unwrap();
+            comparison_float!(Decimal::new(2, 0))
+        );
 
         assert_eq!(Some(true), predicate.evaluate(&event));
     }
@@ -751,15 +800,11 @@ mod tests {
         builder.with_float("bidfloor", 55, 3).unwrap();
         let event = builder.build().unwrap();
 
-        let predicate = Predicate::new(
+        let predicate = greater_than!(
             &attributes,
             "bidfloor",
-            PredicateKind::Comparison(
-                ComparisonOperator::GreaterThan,
-                ComparisonValue::Float(Decimal::new(55, 4)),
-            ),
-        )
-        .unwrap();
+            comparison_float!(Decimal::new(55, 4))
+        );
 
         assert_eq!(Some(true), predicate.evaluate(&event));
     }
@@ -772,15 +817,11 @@ mod tests {
         builder.with_float("bidfloor", 55, 3).unwrap();
         let event = builder.build().unwrap();
 
-        let predicate = Predicate::new(
+        let predicate = greater_than_equal!(
             &attributes,
             "bidfloor",
-            PredicateKind::Comparison(
-                ComparisonOperator::GreaterThanEqual,
-                ComparisonValue::Float(Decimal::new(44, 4)),
-            ),
-        )
-        .unwrap();
+            comparison_float!(Decimal::new(44, 4))
+        );
 
         assert_eq!(Some(true), predicate.evaluate(&event));
     }
@@ -795,12 +836,7 @@ mod tests {
             .unwrap();
         let event = builder.build().unwrap();
 
-        let predicate = Predicate::new(
-            &attributes,
-            "deals",
-            PredicateKind::List(ListOperator::AllOf, ListLiteral::StringList(vec![])),
-        )
-        .unwrap();
+        let predicate = all_of!(&attributes, "deals", string_list!(vec![]));
 
         assert_eq!(Some(false), predicate.evaluate(&event));
     }
@@ -815,15 +851,7 @@ mod tests {
         builder.with_string_list("deals", &[]).unwrap();
         let event = builder.build().unwrap();
 
-        let predicate = Predicate::new(
-            &attributes,
-            "deals",
-            PredicateKind::List(
-                ListOperator::AllOf,
-                ListLiteral::StringList(vec![id, another_id]),
-            ),
-        )
-        .unwrap();
+        let predicate = all_of!(&attributes, "deals", string_list!(vec![id, another_id]));
 
         assert_eq!(Some(true), predicate.evaluate(&event));
     }
@@ -841,15 +869,7 @@ mod tests {
             .unwrap();
         let event = builder.build().unwrap();
 
-        let predicate = Predicate::new(
-            &attributes,
-            "deals",
-            PredicateKind::List(
-                ListOperator::AllOf,
-                ListLiteral::StringList(vec![id, another_id]),
-            ),
-        )
-        .unwrap();
+        let predicate = all_of!(&attributes, "deals", string_list!(vec![id, another_id]));
 
         assert_eq!(Some(false), predicate.evaluate(&event));
     }
@@ -874,24 +894,12 @@ mod tests {
             .unwrap();
         let event_2 = builder.build().unwrap();
 
-        let predicate = Predicate::new(
+        let predicate = all_of!(&attributes, "deals", string_list!(vec![id, another_id]));
+        let predicate_2 = all_of!(
             &attributes,
             "deals",
-            PredicateKind::List(
-                ListOperator::AllOf,
-                ListLiteral::StringList(vec![id, another_id]),
-            ),
-        )
-        .unwrap();
-        let predicate_2 = Predicate::new(
-            &attributes,
-            "deals",
-            PredicateKind::List(
-                ListOperator::AllOf,
-                ListLiteral::StringList(vec![a_third_id, a_fourth_id]),
-            ),
-        )
-        .unwrap();
+            string_list!(vec![a_third_id, a_fourth_id])
+        );
 
         assert_eq!(Some(false), predicate.evaluate(&event));
         assert_eq!(Some(false), predicate_2.evaluate(&event_2));
@@ -912,15 +920,11 @@ mod tests {
             .unwrap();
         let event = builder.build().unwrap();
 
-        let predicate = Predicate::new(
+        let predicate = all_of!(
             &attributes,
             "deals",
-            PredicateKind::List(
-                ListOperator::AllOf,
-                ListLiteral::StringList(vec![id, another_id, a_third_id, a_fourth_id]),
-            ),
-        )
-        .unwrap();
+            string_list!(vec![id, another_id, a_third_id, a_fourth_id])
+        );
 
         assert_eq!(Some(true), predicate.evaluate(&event));
     }
@@ -933,15 +937,7 @@ mod tests {
         builder.with_integer_list("segment_ids", &[]).unwrap();
         let event = builder.build().unwrap();
 
-        let predicate = Predicate::new(
-            &attributes,
-            "segment_ids",
-            PredicateKind::List(
-                ListOperator::OneOf,
-                ListLiteral::IntegerList(vec![1, 2, 3, 4]),
-            ),
-        )
-        .unwrap();
+        let predicate = one_of!(&attributes, "segment_ids", integer_list!(vec![1, 2, 3, 4]));
 
         assert_eq!(Some(false), predicate.evaluate(&event));
     }
@@ -956,12 +952,7 @@ mod tests {
             .unwrap();
         let event = builder.build().unwrap();
 
-        let predicate = Predicate::new(
-            &attributes,
-            "segment_ids",
-            PredicateKind::List(ListOperator::OneOf, ListLiteral::IntegerList(vec![])),
-        )
-        .unwrap();
+        let predicate = one_of!(&attributes, "segment_ids", integer_list!(vec![]));
 
         assert_eq!(Some(false), predicate.evaluate(&event));
     }
@@ -976,12 +967,7 @@ mod tests {
             .unwrap();
         let event = builder.build().unwrap();
 
-        let predicate = Predicate::new(
-            &attributes,
-            "segment_ids",
-            PredicateKind::List(ListOperator::OneOf, ListLiteral::IntegerList(vec![1, 3, 6])),
-        )
-        .unwrap();
+        let predicate = one_of!(&attributes, "segment_ids", integer_list!(vec![1, 3, 6]));
 
         assert_eq!(Some(true), predicate.evaluate(&event));
     }
@@ -996,12 +982,7 @@ mod tests {
             .unwrap();
         let event = builder.build().unwrap();
 
-        let predicate = Predicate::new(
-            &attributes,
-            "segment_ids",
-            PredicateKind::List(ListOperator::OneOf, ListLiteral::IntegerList(vec![1, 3, 5])),
-        )
-        .unwrap();
+        let predicate = one_of!(&attributes, "segment_ids", integer_list!(vec![1, 3, 5]));
 
         assert_eq!(Some(false), predicate.evaluate(&event));
     }
@@ -1016,15 +997,7 @@ mod tests {
             .unwrap();
         let event = builder.build().unwrap();
 
-        let predicate = Predicate::new(
-            &attributes,
-            "segment_ids",
-            PredicateKind::List(
-                ListOperator::NoneOf,
-                ListLiteral::IntegerList(vec![1, 3, 5]),
-            ),
-        )
-        .unwrap();
+        let predicate = none_of!(&attributes, "segment_ids", integer_list!(vec![1, 3, 5]));
 
         assert_eq!(Some(true), predicate.evaluate(&event));
     }
@@ -1039,15 +1012,7 @@ mod tests {
             .unwrap();
         let event = builder.build().unwrap();
 
-        let predicate = Predicate::new(
-            &attributes,
-            "segment_ids",
-            PredicateKind::List(
-                ListOperator::NoneOf,
-                ListLiteral::IntegerList(vec![1, 3, 5]),
-            ),
-        )
-        .unwrap();
+        let predicate = none_of!(&attributes, "segment_ids", integer_list!(vec![1, 3, 5]));
 
         assert_eq!(Some(false), predicate.evaluate(&event));
     }
@@ -1060,15 +1025,7 @@ mod tests {
         builder.with_integer_list("segment_ids", &[]).unwrap();
         let event = builder.build().unwrap();
 
-        let predicate = Predicate::new(
-            &attributes,
-            "segment_ids",
-            PredicateKind::List(
-                ListOperator::NoneOf,
-                ListLiteral::IntegerList(vec![1, 3, 5]),
-            ),
-        )
-        .unwrap();
+        let predicate = none_of!(&attributes, "segment_ids", integer_list!(vec![1, 3, 5]));
 
         assert_eq!(Some(true), predicate.evaluate(&event));
     }
@@ -1083,12 +1040,7 @@ mod tests {
             .unwrap();
         let event = builder.build().unwrap();
 
-        let predicate = Predicate::new(
-            &attributes,
-            "segment_ids",
-            PredicateKind::List(ListOperator::NoneOf, ListLiteral::IntegerList(vec![])),
-        )
-        .unwrap();
+        let predicate = none_of!(&attributes, "segment_ids", integer_list!(vec![]));
 
         assert_eq!(Some(true), predicate.evaluate(&event));
     }
@@ -1101,14 +1053,270 @@ mod tests {
         builder.with_undefined("segment_ids").unwrap();
         let event = builder.build().unwrap();
 
-        let predicate = Predicate::new(
-            &attributes,
-            "segment_ids",
-            PredicateKind::List(ListOperator::NoneOf, ListLiteral::IntegerList(vec![])),
-        )
-        .unwrap();
+        let predicate = none_of!(&attributes, "segment_ids", integer_list!(vec![]));
 
         assert_eq!(None, predicate.evaluate(&event));
+    }
+
+    #[test]
+    fn can_negate_a_variable() {
+        let attributes = define_attributes();
+        let strings = StringTable::new();
+        let mut builder = an_event_builder(&attributes, &strings);
+        builder.with_boolean("private", true).unwrap();
+        let event = builder.build().unwrap();
+        let predicate = variable!(&attributes, "private");
+
+        assert_eq!(
+            predicate.evaluate(&event).map(std::ops::Not::not),
+            (!predicate).evaluate(&event)
+        )
+    }
+
+    #[test]
+    fn can_negate_a_negated_variable() {
+        let attributes = define_attributes();
+        let strings = StringTable::new();
+        let mut builder = an_event_builder(&attributes, &strings);
+        builder.with_boolean("private", true).unwrap();
+        let event = builder.build().unwrap();
+        let predicate = negated_variable!(&attributes, "private");
+
+        assert_eq!(
+            predicate.evaluate(&event).map(std::ops::Not::not),
+            (!predicate).evaluate(&event)
+        )
+    }
+
+    #[test]
+    fn can_negate_a_null_check() {
+        let attributes = define_attributes();
+        let strings = StringTable::new();
+        let mut builder = an_event_builder(&attributes, &strings);
+        builder.with_boolean("private", true).unwrap();
+        let event = builder.build().unwrap();
+        let predicate = is_null!(&attributes, "private");
+
+        assert_eq!(
+            predicate.evaluate(&event).map(std::ops::Not::not),
+            (!predicate).evaluate(&event)
+        )
+    }
+
+    #[test]
+    fn can_negate_a_not_null_check() {
+        let attributes = define_attributes();
+        let strings = StringTable::new();
+        let mut builder = an_event_builder(&attributes, &strings);
+        builder.with_boolean("private", true).unwrap();
+        let event = builder.build().unwrap();
+        let predicate = is_not_null!(&attributes, "private");
+
+        assert_eq!(
+            predicate.evaluate(&event).map(std::ops::Not::not),
+            (!predicate).evaluate(&event)
+        )
+    }
+
+    #[test]
+    fn can_negate_an_empty_check() {
+        let attributes = define_attributes();
+        let strings = StringTable::new();
+        let mut builder = an_event_builder(&attributes, &strings);
+        builder
+            .with_integer_list("segment_ids", &[1, 2, 3])
+            .unwrap();
+        let event = builder.build().unwrap();
+        let predicate = is_empty!(&attributes, "segment_ids");
+
+        assert_eq!(
+            predicate.evaluate(&event).map(std::ops::Not::not),
+            (!predicate).evaluate(&event)
+        )
+    }
+
+    #[test]
+    fn can_negate_a_not_empty_check() {
+        let attributes = define_attributes();
+        let strings = StringTable::new();
+        let mut builder = an_event_builder(&attributes, &strings);
+        builder
+            .with_integer_list("segment_ids", &[1, 2, 3])
+            .unwrap();
+        let event = builder.build().unwrap();
+        let predicate = is_not_empty!(&attributes, "segment_ids");
+
+        assert_eq!(
+            predicate.evaluate(&event).map(std::ops::Not::not),
+            (!predicate).evaluate(&event)
+        )
+    }
+
+    #[test]
+    fn can_negate_a_set_in_predicate() {
+        let attributes = define_attributes();
+        let strings = StringTable::new();
+        let mut builder = an_event_builder(&attributes, &strings);
+        builder.with_integer("exchange_id", AN_EXCHANGE_ID).unwrap();
+        let event = builder.build().unwrap();
+        let predicate = set_in!(&attributes, "exchange_id", integer_list!(vec![]));
+
+        assert_eq!(
+            predicate.evaluate(&event).map(std::ops::Not::not),
+            (!predicate).evaluate(&event)
+        )
+    }
+
+    #[test]
+    fn can_negate_a_set_not_in_predicate() {
+        let attributes = define_attributes();
+        let strings = StringTable::new();
+        let mut builder = an_event_builder(&attributes, &strings);
+        builder.with_integer("exchange_id", AN_EXCHANGE_ID).unwrap();
+        let event = builder.build().unwrap();
+        let predicate = set_not_in!(&attributes, "exchange_id", integer_list!(vec![]));
+
+        assert_eq!(
+            predicate.evaluate(&event).map(std::ops::Not::not),
+            (!predicate).evaluate(&event)
+        )
+    }
+
+    #[test]
+    fn can_negate_an_equal_predicate() {
+        let attributes = define_attributes();
+        let mut strings = StringTable::new();
+        let string_id = strings.get_or_update(A_COUNTRY);
+        let mut builder = an_event_builder(&attributes, &strings);
+        builder.with_string("country", A_COUNTRY).unwrap();
+        let event = builder.build().unwrap();
+        let predicate = equal!(&attributes, "country", primitive_string!(string_id));
+
+        assert_eq!(
+            predicate.evaluate(&event).map(std::ops::Not::not),
+            (!predicate).evaluate(&event)
+        )
+    }
+
+    #[test]
+    fn can_negate_a_not_equal_predicate() {
+        let attributes = define_attributes();
+        let mut strings = StringTable::new();
+        let string_id = strings.get_or_update(A_COUNTRY);
+        let mut builder = an_event_builder(&attributes, &strings);
+        builder.with_string("country", A_COUNTRY).unwrap();
+        let event = builder.build().unwrap();
+        let predicate = not_equal!(&attributes, "country", primitive_string!(string_id));
+
+        assert_eq!(
+            predicate.evaluate(&event).map(std::ops::Not::not),
+            (!predicate).evaluate(&event)
+        )
+    }
+
+    #[test]
+    fn can_negate_a_less_than_predicate() {
+        let attributes = define_attributes();
+        let strings = StringTable::new();
+        let mut builder = an_event_builder(&attributes, &strings);
+        builder.with_integer("exchange_id", AN_EXCHANGE_ID).unwrap();
+        let event = builder.build().unwrap();
+        let predicate = less_than!(&attributes, "exchange_id", comparison_integer!(0));
+
+        assert_eq!(
+            predicate.evaluate(&event).map(std::ops::Not::not),
+            (!predicate).evaluate(&event)
+        )
+    }
+
+    #[test]
+    fn can_negate_a_less_than_equal_predicate() {
+        let attributes = define_attributes();
+        let strings = StringTable::new();
+        let mut builder = an_event_builder(&attributes, &strings);
+        builder.with_integer("exchange_id", AN_EXCHANGE_ID).unwrap();
+        let event = builder.build().unwrap();
+        let predicate = less_than_equal!(&attributes, "exchange_id", comparison_integer!(0));
+
+        assert_eq!(
+            predicate.evaluate(&event).map(std::ops::Not::not),
+            (!predicate).evaluate(&event)
+        )
+    }
+
+    #[test]
+    fn can_negate_a_greater_than_predicate() {
+        let attributes = define_attributes();
+        let strings = StringTable::new();
+        let mut builder = an_event_builder(&attributes, &strings);
+        builder.with_integer("exchange_id", AN_EXCHANGE_ID).unwrap();
+        let event = builder.build().unwrap();
+        let predicate = greater_than!(&attributes, "exchange_id", comparison_integer!(0));
+
+        assert_eq!(
+            predicate.evaluate(&event).map(std::ops::Not::not),
+            (!predicate).evaluate(&event)
+        )
+    }
+
+    #[test]
+    fn can_negate_a_greater_than_equal_predicate() {
+        let attributes = define_attributes();
+        let strings = StringTable::new();
+        let mut builder = an_event_builder(&attributes, &strings);
+        builder.with_integer("exchange_id", AN_EXCHANGE_ID).unwrap();
+        let event = builder.build().unwrap();
+        let predicate = greater_than_equal!(&attributes, "exchange_id", comparison_integer!(0));
+
+        assert_eq!(
+            predicate.evaluate(&event).map(std::ops::Not::not),
+            (!predicate).evaluate(&event)
+        )
+    }
+
+    #[test]
+    fn can_negate_a_one_of_predicate() {
+        let attributes = define_attributes();
+        let strings = StringTable::new();
+        let mut builder = an_event_builder(&attributes, &strings);
+        builder.with_integer_list("segment_ids", &[]).unwrap();
+        let event = builder.build().unwrap();
+        let predicate = one_of!(&attributes, "segment_ids", integer_list!(vec![1, 2, 3, 4]));
+
+        assert_eq!(
+            predicate.evaluate(&event).map(std::ops::Not::not),
+            (!predicate).evaluate(&event)
+        )
+    }
+
+    #[test]
+    fn can_negate_a_none_of_predicate() {
+        let attributes = define_attributes();
+        let strings = StringTable::new();
+        let mut builder = an_event_builder(&attributes, &strings);
+        builder.with_integer_list("segment_ids", &[]).unwrap();
+        let event = builder.build().unwrap();
+        let predicate = none_of!(&attributes, "segment_ids", integer_list!(vec![1, 2, 3, 4]));
+
+        assert_eq!(
+            predicate.evaluate(&event).map(std::ops::Not::not),
+            (!predicate).evaluate(&event)
+        )
+    }
+
+    #[test]
+    fn can_negate_an_all_of_predicate() {
+        let attributes = define_attributes();
+        let strings = StringTable::new();
+        let mut builder = an_event_builder(&attributes, &strings);
+        builder.with_integer_list("segment_ids", &[]).unwrap();
+        let event = builder.build().unwrap();
+        let predicate = all_of!(&attributes, "segment_ids", integer_list!(vec![1, 2, 3, 4]));
+
+        assert_eq!(
+            predicate.evaluate(&event).map(std::ops::Not::not),
+            (!predicate).evaluate(&event)
+        )
     }
 
     proptest! {
@@ -1123,12 +1331,7 @@ mod tests {
                 .unwrap();
             let event = builder.build().unwrap();
 
-            let predicate = Predicate::new(
-                &attributes,
-                "exchange_id",
-                PredicateKind::Set(SetOperator::In, ListLiteral::IntegerList(value)),
-            )
-            .unwrap();
+            let predicate = set_in!(&attributes, "exchange_id", integer_list!(value));
 
             assert_eq!(Some(true), predicate.evaluate(&event));
         }
@@ -1147,12 +1350,7 @@ mod tests {
                 .unwrap();
             let event = builder.build().unwrap();
 
-            let predicate = Predicate::new(
-                &attributes,
-                "segment_ids",
-                PredicateKind::List(ListOperator::OneOf, ListLiteral::IntegerList(value)),
-            )
-            .unwrap();
+            let predicate = one_of!(&attributes, "segment_ids", integer_list!(value));
 
             assert_eq!(Some(true), predicate.evaluate(&event));
         }
@@ -1170,12 +1368,7 @@ mod tests {
                 .unwrap();
             let event = builder.build().unwrap();
 
-            let predicate = Predicate::new(
-                &attributes,
-                "segment_ids",
-                PredicateKind::List(ListOperator::AllOf, ListLiteral::IntegerList(value)),
-            )
-            .unwrap();
+            let predicate = all_of!(&attributes, "segment_ids", integer_list!(value));
 
             assert_eq!(Some(true), predicate.evaluate(&event));
         }

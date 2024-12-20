@@ -216,6 +216,12 @@ pub mod predicates {
         };
     }
 
+    macro_rules! primitive_integer {
+        ($value:expr) => {
+            PrimitiveLiteral::Integer($value)
+        };
+    }
+
     macro_rules! primitive_string {
         ($value:expr) => {
             PrimitiveLiteral::String($value)
@@ -246,6 +252,7 @@ pub mod predicates {
     pub(crate) use not_equal;
     pub(crate) use one_of;
     pub(crate) use predicate;
+    pub(crate) use primitive_integer;
     pub(crate) use primitive_string;
     pub(crate) use set_in;
     pub(crate) use set_not_in;

@@ -33,6 +33,15 @@ mod tests {
             ComparisonOperator, ComparisonValue, EqualityOperator, ListLiteral, ListOperator,
             NullOperator, Predicate, PredicateKind, PrimitiveLiteral, SetOperator,
         },
+        test_utils::{
+            ast::{and, not, or, value},
+            predicates::{
+                all_of, comparison_integer, equal, greater_than, greater_than_equal, integer_list,
+                is_empty, is_not_empty, is_not_null, is_null, less_than, less_than_equal, none_of,
+                not_equal, one_of, predicate, primitive_integer, set_in, set_not_in, string_list,
+                variable,
+            },
+        },
     };
 
     #[test]
@@ -63,17 +72,11 @@ mod tests {
         let parsed = parse("price < 15", &attributes, &mut strings);
 
         assert_eq!(
-            Ok(Node::Value(
-                Predicate::new(
-                    &attributes,
-                    "price",
-                    PredicateKind::Comparison(
-                        ComparisonOperator::LessThan,
-                        ComparisonValue::Integer(15)
-                    ),
-                )
-                .unwrap()
-            )),
+            Ok(value!(less_than!(
+                &attributes,
+                "price",
+                comparison_integer!(15)
+            ))),
             parsed
         );
     }
@@ -86,17 +89,11 @@ mod tests {
         let parsed = parse("15 < price", &attributes, &mut strings);
 
         assert_eq!(
-            Ok(Node::Value(
-                Predicate::new(
-                    &attributes,
-                    "price",
-                    PredicateKind::Comparison(
-                        ComparisonOperator::GreaterThan,
-                        ComparisonValue::Integer(15)
-                    )
-                )
-                .unwrap()
-            )),
+            Ok(value!(greater_than!(
+                &attributes,
+                "price",
+                comparison_integer!(15)
+            ))),
             parsed
         );
     }
@@ -109,17 +106,11 @@ mod tests {
         let parsed = parse("price <= 15", &attributes, &mut strings);
 
         assert_eq!(
-            Ok(Node::Value(
-                Predicate::new(
-                    &attributes,
-                    "price",
-                    PredicateKind::Comparison(
-                        ComparisonOperator::LessThanEqual,
-                        ComparisonValue::Integer(15)
-                    )
-                )
-                .unwrap()
-            )),
+            Ok(value!(less_than_equal!(
+                &attributes,
+                "price",
+                comparison_integer!(15)
+            ))),
             parsed
         );
     }
@@ -132,17 +123,11 @@ mod tests {
         let parsed = parse("15 <= price", &attributes, &mut strings);
 
         assert_eq!(
-            Ok(Node::Value(
-                Predicate::new(
-                    &attributes,
-                    "price",
-                    PredicateKind::Comparison(
-                        ComparisonOperator::GreaterThanEqual,
-                        ComparisonValue::Integer(15)
-                    )
-                )
-                .unwrap()
-            )),
+            Ok(value!(greater_than_equal!(
+                &attributes,
+                "price",
+                comparison_integer!(15)
+            ))),
             parsed
         );
     }
@@ -155,17 +140,11 @@ mod tests {
         let parsed = parse("price > 15", &attributes, &mut strings);
 
         assert_eq!(
-            Ok(Node::Value(
-                Predicate::new(
-                    &attributes,
-                    "price",
-                    PredicateKind::Comparison(
-                        ComparisonOperator::GreaterThan,
-                        ComparisonValue::Integer(15)
-                    )
-                )
-                .unwrap()
-            )),
+            Ok(value!(greater_than!(
+                &attributes,
+                "price",
+                comparison_integer!(15)
+            ))),
             parsed
         );
     }
@@ -178,17 +157,11 @@ mod tests {
         let parsed = parse("price >= 15", &attributes, &mut strings);
 
         assert_eq!(
-            Ok(Node::Value(
-                Predicate::new(
-                    &attributes,
-                    "price",
-                    PredicateKind::Comparison(
-                        ComparisonOperator::GreaterThanEqual,
-                        ComparisonValue::Integer(15)
-                    )
-                )
-                .unwrap()
-            )),
+            Ok(value!(greater_than_equal!(
+                &attributes,
+                "price",
+                comparison_integer!(15)
+            ))),
             parsed
         );
     }
@@ -201,17 +174,11 @@ mod tests {
         let parsed = parse("15 > price", &attributes, &mut strings);
 
         assert_eq!(
-            Ok(Node::Value(
-                Predicate::new(
-                    &attributes,
-                    "price",
-                    PredicateKind::Comparison(
-                        ComparisonOperator::LessThan,
-                        ComparisonValue::Integer(15)
-                    )
-                )
-                .unwrap()
-            )),
+            Ok(value!(less_than!(
+                &attributes,
+                "price",
+                comparison_integer!(15)
+            ))),
             parsed
         );
     }
@@ -224,17 +191,11 @@ mod tests {
         let parsed = parse("15 >= price", &attributes, &mut strings);
 
         assert_eq!(
-            Ok(Node::Value(
-                Predicate::new(
-                    &attributes,
-                    "price",
-                    PredicateKind::Comparison(
-                        ComparisonOperator::LessThanEqual,
-                        ComparisonValue::Integer(15)
-                    )
-                )
-                .unwrap()
-            )),
+            Ok(value!(less_than_equal!(
+                &attributes,
+                "price",
+                comparison_integer!(15)
+            ))),
             parsed
         );
     }
@@ -247,14 +208,11 @@ mod tests {
         let parsed = parse("exchange_id = 1", &attributes, &mut strings);
 
         assert_eq!(
-            Ok(Node::Value(
-                Predicate::new(
-                    &attributes,
-                    "exchange_id",
-                    PredicateKind::Equality(EqualityOperator::Equal, PrimitiveLiteral::Integer(1))
-                )
-                .unwrap()
-            )),
+            Ok(value!(equal!(
+                &attributes,
+                "exchange_id",
+                primitive_integer!(1)
+            ))),
             parsed
         );
     }
@@ -267,14 +225,11 @@ mod tests {
         let parsed = parse("1 = exchange_id", &attributes, &mut strings);
 
         assert_eq!(
-            Ok(Node::Value(
-                Predicate::new(
-                    &attributes,
-                    "exchange_id",
-                    PredicateKind::Equality(EqualityOperator::Equal, PrimitiveLiteral::Integer(1))
-                )
-                .unwrap()
-            )),
+            Ok(value!(equal!(
+                &attributes,
+                "exchange_id",
+                primitive_integer!(1)
+            ))),
             parsed
         );
     }
@@ -287,17 +242,11 @@ mod tests {
         let parsed = parse("exchange_id <> 1", &attributes, &mut strings);
 
         assert_eq!(
-            Ok(Node::Value(
-                Predicate::new(
-                    &attributes,
-                    "exchange_id",
-                    PredicateKind::Equality(
-                        EqualityOperator::NotEqual,
-                        PrimitiveLiteral::Integer(1)
-                    )
-                )
-                .unwrap()
-            )),
+            Ok(value!(not_equal!(
+                &attributes,
+                "exchange_id",
+                primitive_integer!(1)
+            ))),
             parsed
         );
     }
@@ -310,17 +259,11 @@ mod tests {
         let parsed = parse("1 <> exchange_id", &attributes, &mut strings);
 
         assert_eq!(
-            Ok(Node::Value(
-                Predicate::new(
-                    &attributes,
-                    "exchange_id",
-                    PredicateKind::Equality(
-                        EqualityOperator::NotEqual,
-                        PrimitiveLiteral::Integer(1)
-                    )
-                )
-                .unwrap()
-            )),
+            Ok(value!(not_equal!(
+                &attributes,
+                "exchange_id",
+                primitive_integer!(1)
+            ))),
             parsed
         );
     }
@@ -332,17 +275,7 @@ mod tests {
 
         let parsed = parse("exchange_id is null", &attributes, &mut strings);
 
-        assert_eq!(
-            Ok(Node::Value(
-                Predicate::new(
-                    &attributes,
-                    "exchange_id",
-                    PredicateKind::Null(NullOperator::IsNull)
-                )
-                .unwrap()
-            )),
-            parsed
-        );
+        assert_eq!(Ok(value!(is_null!(&attributes, "exchange_id"))), parsed);
     }
 
     #[test]
@@ -352,17 +285,7 @@ mod tests {
 
         let parsed = parse("exchange_id is not null", &attributes, &mut strings);
 
-        assert_eq!(
-            Ok(Node::Value(
-                Predicate::new(
-                    &attributes,
-                    "exchange_id",
-                    PredicateKind::Null(NullOperator::IsNotNull)
-                )
-                .unwrap()
-            )),
-            parsed
-        );
+        assert_eq!(Ok(value!(is_not_null!(&attributes, "exchange_id"))), parsed);
     }
 
     #[test]
@@ -372,17 +295,7 @@ mod tests {
 
         let parsed = parse("deals is empty", &attributes, &mut strings);
 
-        assert_eq!(
-            Ok(Node::Value(
-                Predicate::new(
-                    &attributes,
-                    "deals",
-                    PredicateKind::Null(NullOperator::IsEmpty)
-                )
-                .unwrap()
-            )),
-            parsed
-        );
+        assert_eq!(Ok(value!(is_empty!(&attributes, "deals"))), parsed);
     }
 
     #[test]
@@ -392,17 +305,7 @@ mod tests {
 
         let parsed = parse("deals is not empty", &attributes, &mut strings);
 
-        assert_eq!(
-            Ok(Node::Value(
-                Predicate::new(
-                    &attributes,
-                    "deals",
-                    PredicateKind::Null(NullOperator::IsNotEmpty)
-                )
-                .unwrap()
-            )),
-            parsed
-        );
+        assert_eq!(Ok(value!(is_not_empty!(&attributes, "deals"))), parsed);
     }
 
     #[test]
@@ -423,14 +326,7 @@ mod tests {
         let parsed = parse("ids one of [1]", &attributes, &mut strings);
 
         assert_eq!(
-            Ok(Node::Value(
-                Predicate::new(
-                    &attributes,
-                    "ids",
-                    PredicateKind::List(ListOperator::OneOf, ListLiteral::IntegerList(vec![1]))
-                )
-                .unwrap()
-            )),
+            Ok(value!(one_of!(&attributes, "ids", integer_list!(vec![1])))),
             parsed
         );
     }
@@ -443,17 +339,11 @@ mod tests {
         let parsed = parse("ids one of [1, 2, 3]", &attributes, &mut strings);
 
         assert_eq!(
-            Ok(Node::Value(
-                Predicate::new(
-                    &attributes,
-                    "ids",
-                    PredicateKind::List(
-                        ListOperator::OneOf,
-                        ListLiteral::IntegerList(vec![1, 2, 3])
-                    )
-                )
-                .unwrap()
-            )),
+            Ok(value!(one_of!(
+                &attributes,
+                "ids",
+                integer_list!(vec![1, 2, 3])
+            ))),
             parsed
         );
     }
@@ -466,17 +356,11 @@ mod tests {
         let parsed = parse("ids one of [1, 2, 3]", &attributes, &mut strings);
 
         assert_eq!(
-            Ok(Node::Value(
-                Predicate::new(
-                    &attributes,
-                    "ids",
-                    PredicateKind::List(
-                        ListOperator::OneOf,
-                        ListLiteral::IntegerList(vec![1, 2, 3])
-                    )
-                )
-                .unwrap()
-            )),
+            Ok(value!(one_of!(
+                &attributes,
+                "ids",
+                integer_list!(vec![1, 2, 3])
+            ))),
             parsed
         );
     }
@@ -489,17 +373,11 @@ mod tests {
         let parsed = parse(r##"deals one of ["deal-1"]"##, &attributes, &mut strings);
 
         assert_eq!(
-            Ok(Node::Value(
-                Predicate::new(
-                    &attributes,
-                    "deals",
-                    PredicateKind::List(
-                        ListOperator::OneOf,
-                        ListLiteral::StringList(vec![strings.get("deal-1")])
-                    )
-                )
-                .unwrap()
-            )),
+            Ok(value!(one_of!(
+                &attributes,
+                "deals",
+                string_list!(vec![strings.get("deal-1")])
+            ))),
             parsed
         );
     }
@@ -516,21 +394,15 @@ mod tests {
         );
 
         assert_eq!(
-            Ok(Node::Value(
-                Predicate::new(
-                    &attributes,
-                    "deals",
-                    PredicateKind::List(
-                        ListOperator::OneOf,
-                        ListLiteral::StringList(vec![
-                            strings.get("deal-1"),
-                            strings.get("deal-2"),
-                            strings.get("deal-3")
-                        ])
-                    )
-                )
-                .unwrap()
-            )),
+            Ok(value!(one_of!(
+                &attributes,
+                "deals",
+                string_list!(vec![
+                    strings.get("deal-1"),
+                    strings.get("deal-2"),
+                    strings.get("deal-3")
+                ])
+            ))),
             parsed
         );
     }
@@ -543,17 +415,11 @@ mod tests {
         let parsed = parse("ids all of [1, 2, 3]", &attributes, &mut strings);
 
         assert_eq!(
-            Ok(Node::Value(
-                Predicate::new(
-                    &attributes,
-                    "ids",
-                    PredicateKind::List(
-                        ListOperator::AllOf,
-                        ListLiteral::IntegerList(vec![1, 2, 3])
-                    )
-                )
-                .unwrap()
-            )),
+            Ok(value!(all_of!(
+                &attributes,
+                "ids",
+                integer_list!(vec![1, 2, 3])
+            ))),
             parsed
         );
     }
@@ -570,17 +436,11 @@ mod tests {
         );
 
         assert_eq!(
-            Ok(Node::Value(
-                Predicate::new(
-                    &attributes,
-                    "ids",
-                    PredicateKind::List(
-                        ListOperator::AllOf,
-                        ListLiteral::IntegerList(vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])
-                    )
-                )
-                .unwrap()
-            )),
+            Ok(value!(all_of!(
+                &attributes,
+                "ids",
+                integer_list!(vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])
+            ))),
             parsed
         );
     }
@@ -597,21 +457,15 @@ mod tests {
         );
 
         assert_eq!(
-            Ok(Node::Value(
-                Predicate::new(
-                    &attributes,
-                    "deals",
-                    PredicateKind::List(
-                        ListOperator::AllOf,
-                        ListLiteral::StringList(vec![
-                            strings.get("deal-1"),
-                            strings.get("deal-2"),
-                            strings.get("deal-3")
-                        ])
-                    )
-                )
-                .unwrap()
-            )),
+            Ok(value!(all_of!(
+                &attributes,
+                "deals",
+                string_list!(vec![
+                    strings.get("deal-1"),
+                    strings.get("deal-2"),
+                    strings.get("deal-3")
+                ])
+            ))),
             parsed
         );
     }
@@ -624,17 +478,11 @@ mod tests {
         let parsed = parse("ids none of [1, 2, 3]", &attributes, &mut strings);
 
         assert_eq!(
-            Ok(Node::Value(
-                Predicate::new(
-                    &attributes,
-                    "ids",
-                    PredicateKind::List(
-                        ListOperator::NoneOf,
-                        ListLiteral::IntegerList(vec![1, 2, 3])
-                    )
-                )
-                .unwrap()
-            )),
+            Ok(value!(none_of!(
+                &attributes,
+                "ids",
+                integer_list!(vec![1, 2, 3])
+            ))),
             parsed
         );
     }
@@ -651,21 +499,15 @@ mod tests {
         );
 
         assert_eq!(
-            Ok(Node::Value(
-                Predicate::new(
-                    &attributes,
-                    "deals",
-                    PredicateKind::List(
-                        ListOperator::NoneOf,
-                        ListLiteral::StringList(vec![
-                            strings.get("deal-1"),
-                            strings.get("deal-2"),
-                            strings.get("deal-3")
-                        ])
-                    )
-                )
-                .unwrap()
-            )),
+            Ok(value!(none_of!(
+                &attributes,
+                "deals",
+                string_list!(vec![
+                    strings.get("deal-1"),
+                    strings.get("deal-2"),
+                    strings.get("deal-3")
+                ])
+            ))),
             parsed
         );
     }
@@ -682,21 +524,15 @@ mod tests {
         );
 
         assert_eq!(
-            Ok(Node::Value(
-                Predicate::new(
-                    &attributes,
-                    "deals",
-                    PredicateKind::List(
-                        ListOperator::NoneOf,
-                        ListLiteral::StringList(vec![
-                            strings.get("deal-1"),
-                            strings.get("deal-2"),
-                            strings.get("deal-3")
-                        ])
-                    )
-                )
-                .unwrap()
-            )),
+            Ok(value!(none_of!(
+                &attributes,
+                "deals",
+                string_list!(vec![
+                    strings.get("deal-1"),
+                    strings.get("deal-2"),
+                    strings.get("deal-3")
+                ])
+            ))),
             parsed
         );
     }
@@ -723,21 +559,15 @@ mod tests {
         );
 
         assert_eq!(
-            Ok(Node::Value(
-                Predicate::new(
-                    &attributes,
-                    "deal",
-                    PredicateKind::Set(
-                        SetOperator::In,
-                        ListLiteral::StringList(vec![
-                            strings.get("deal-1"),
-                            strings.get("deal-2"),
-                            strings.get("deal-3")
-                        ])
-                    )
-                )
-                .unwrap()
-            )),
+            Ok(value!(set_in!(
+                &attributes,
+                "deal",
+                string_list!(vec![
+                    strings.get("deal-1"),
+                    strings.get("deal-2"),
+                    strings.get("deal-3")
+                ])
+            ))),
             parsed
         );
     }
@@ -754,14 +584,11 @@ mod tests {
         );
 
         assert_eq!(
-            Ok(Node::Value(
-                Predicate::new(
-                    &attributes,
-                    "exchange_id",
-                    PredicateKind::Set(SetOperator::NotIn, ListLiteral::IntegerList(vec![1, 2, 3]))
-                )
-                .unwrap()
-            )),
+            Ok(value!(set_not_in!(
+                &attributes,
+                "exchange_id",
+                integer_list!(vec![1, 2, 3])
+            ))),
             parsed
         );
     }
@@ -788,34 +615,16 @@ mod tests {
         );
 
         assert_eq!(
-            Ok(Node::And(
-                Box::new(Node::Value(
-                    Predicate::new(
-                        &attributes,
-                        "deal_ids",
-                        PredicateKind::List(
-                            ListOperator::NoneOf,
-                            ListLiteral::StringList(vec![
-                                strings.get("deal-2"),
-                                strings.get("deal-4")
-                            ])
-                        )
-                    )
-                    .unwrap()
+            Ok(and!(
+                value!(none_of!(
+                    &attributes,
+                    "deal_ids",
+                    string_list!(vec![strings.get("deal-2"), strings.get("deal-4")])
                 )),
-                Box::new(Node::Value(
-                    Predicate::new(
-                        &attributes,
-                        "deal_ids",
-                        PredicateKind::List(
-                            ListOperator::OneOf,
-                            ListLiteral::StringList(vec![
-                                strings.get("deal-1"),
-                                strings.get("deal-3")
-                            ])
-                        )
-                    )
-                    .unwrap()
+                value!(one_of!(
+                    &attributes,
+                    "deal_ids",
+                    string_list!(vec![strings.get("deal-1"), strings.get("deal-3")])
                 ))
             )),
             parsed
@@ -834,38 +643,17 @@ mod tests {
         );
 
         assert_eq!(
-            Ok(Node::And(
-                Box::new(Node::And(
-                    Box::new(Node::Value(
-                        Predicate::new(
-                            &attributes,
-                            "exchange_id",
-                            PredicateKind::Equality(
-                                EqualityOperator::Equal,
-                                PrimitiveLiteral::Integer(1)
-                            )
-                        )
-                        .unwrap()
-                    )),
-                    Box::new(Node::Value(
-                        Predicate::new(&attributes, "private", PredicateKind::Variable).unwrap()
-                    ))
-                )),
-                Box::new(Node::Value(
-                    Predicate::new(
-                        &attributes,
-                        "deal_ids",
-                        PredicateKind::List(
-                            ListOperator::NoneOf,
-                            ListLiteral::StringList(vec![
-                                strings.get("deal-2"),
-                                strings.get("deal-4")
-                            ])
-                        )
-                    )
-                    .unwrap()
+            Ok(and!(
+                and!(
+                    value!(equal!(&attributes, "exchange_id", primitive_integer!(1))),
+                    value!(variable!(&attributes, "private"))
+                ),
+                value!(none_of!(
+                    &attributes,
+                    "deal_ids",
+                    string_list!(vec![strings.get("deal-2"), strings.get("deal-4")])
                 ))
-            ),),
+            )),
             parsed
         );
     }
@@ -882,53 +670,22 @@ mod tests {
         );
 
         assert_eq!(
-            Ok(Node::And(
-                Box::new(Node::And(
-                    Box::new(Node::And(
-                        Box::new(Node::Value(
-                            Predicate::new(
-                                &attributes,
-                                "exchange_id",
-                                PredicateKind::Equality(
-                                    EqualityOperator::Equal,
-                                    PrimitiveLiteral::Integer(1)
-                                )
-                            )
-                            .unwrap()
-                        )),
-                        Box::new(Node::Value(
-                            Predicate::new(&attributes, "private", PredicateKind::Variable)
-                                .unwrap()
-                        ))
-                    )),
-                    Box::new(Node::Value(
-                        Predicate::new(
-                            &attributes,
-                            "deal_ids",
-                            PredicateKind::List(
-                                ListOperator::NoneOf,
-                                ListLiteral::StringList(vec![
-                                    strings.get("deal-2"),
-                                    strings.get("deal-4")
-                                ])
-                            )
-                        )
-                        .unwrap()
-                    ))
-                )),
-                Box::new(Node::Value(
-                    Predicate::new(
+            Ok(and!(
+                and!(
+                    and!(
+                        value!(equal!(&attributes, "exchange_id", primitive_integer!(1))),
+                        value!(variable!(&attributes, "private"))
+                    ),
+                    value!(none_of!(
                         &attributes,
                         "deal_ids",
-                        PredicateKind::List(
-                            ListOperator::OneOf,
-                            ListLiteral::StringList(vec![
-                                strings.get("deal-1"),
-                                strings.get("deal-3")
-                            ])
-                        )
-                    )
-                    .unwrap()
+                        string_list!(vec![strings.get("deal-2"), strings.get("deal-4")])
+                    ))
+                ),
+                value!(one_of!(
+                    &attributes,
+                    "deal_ids",
+                    string_list!(vec![strings.get("deal-1"), strings.get("deal-3")])
                 ))
             )),
             parsed
@@ -947,34 +704,16 @@ mod tests {
         );
 
         assert_eq!(
-            Ok(Node::Or(
-                Box::new(Node::Value(
-                    Predicate::new(
-                        &attributes,
-                        "deal_ids",
-                        PredicateKind::List(
-                            ListOperator::NoneOf,
-                            ListLiteral::StringList(vec![
-                                strings.get("deal-2"),
-                                strings.get("deal-4")
-                            ])
-                        )
-                    )
-                    .unwrap()
+            Ok(or!(
+                value!(none_of!(
+                    &attributes,
+                    "deal_ids",
+                    string_list!(vec![strings.get("deal-2"), strings.get("deal-4")])
                 )),
-                Box::new(Node::Value(
-                    Predicate::new(
-                        &attributes,
-                        "deal_ids",
-                        PredicateKind::List(
-                            ListOperator::OneOf,
-                            ListLiteral::StringList(vec![
-                                strings.get("deal-1"),
-                                strings.get("deal-3")
-                            ])
-                        )
-                    )
-                    .unwrap()
+                value!(one_of!(
+                    &attributes,
+                    "deal_ids",
+                    string_list!(vec![strings.get("deal-1"), strings.get("deal-3")])
                 ))
             )),
             parsed
@@ -993,38 +732,17 @@ mod tests {
         );
 
         assert_eq!(
-            Ok(Node::Or(
-                Box::new(Node::Or(
-                    Box::new(Node::Value(
-                        Predicate::new(
-                            &attributes,
-                            "exchange_id",
-                            PredicateKind::Equality(
-                                EqualityOperator::Equal,
-                                PrimitiveLiteral::Integer(1)
-                            )
-                        )
-                        .unwrap()
-                    )),
-                    Box::new(Node::Value(
-                        Predicate::new(&attributes, "private", PredicateKind::Variable).unwrap()
-                    ))
-                )),
-                Box::new(Node::Value(
-                    Predicate::new(
-                        &attributes,
-                        "deal_ids",
-                        PredicateKind::List(
-                            ListOperator::NoneOf,
-                            ListLiteral::StringList(vec![
-                                strings.get("deal-2"),
-                                strings.get("deal-4")
-                            ])
-                        )
-                    )
-                    .unwrap()
+            Ok(or!(
+                or!(
+                    value!(equal!(&attributes, "exchange_id", primitive_integer!(1))),
+                    value!(variable!(&attributes, "private"))
+                ),
+                value!(none_of!(
+                    &attributes,
+                    "deal_ids",
+                    string_list!(vec![strings.get("deal-2"), strings.get("deal-4")])
                 ))
-            ),),
+            )),
             parsed
         );
     }
@@ -1041,53 +759,22 @@ mod tests {
         );
 
         assert_eq!(
-            Ok(Node::Or(
-                Box::new(Node::Or(
-                    Box::new(Node::Or(
-                        Box::new(Node::Value(
-                            Predicate::new(
-                                &attributes,
-                                "exchange_id",
-                                PredicateKind::Equality(
-                                    EqualityOperator::Equal,
-                                    PrimitiveLiteral::Integer(1)
-                                )
-                            )
-                            .unwrap()
-                        )),
-                        Box::new(Node::Value(
-                            Predicate::new(&attributes, "private", PredicateKind::Variable)
-                                .unwrap()
-                        ))
-                    )),
-                    Box::new(Node::Value(
-                        Predicate::new(
-                            &attributes,
-                            "deal_ids",
-                            PredicateKind::List(
-                                ListOperator::NoneOf,
-                                ListLiteral::StringList(vec![
-                                    strings.get("deal-2"),
-                                    strings.get("deal-4")
-                                ])
-                            )
-                        )
-                        .unwrap()
-                    ))
-                )),
-                Box::new(Node::Value(
-                    Predicate::new(
+            Ok(or!(
+                or!(
+                    or!(
+                        value!(equal!(&attributes, "exchange_id", primitive_integer!(1))),
+                        value!(variable!(&attributes, "private"))
+                    ),
+                    value!(none_of!(
                         &attributes,
                         "deal_ids",
-                        PredicateKind::List(
-                            ListOperator::OneOf,
-                            ListLiteral::StringList(vec![
-                                strings.get("deal-1"),
-                                strings.get("deal-3")
-                            ])
-                        )
-                    )
-                    .unwrap()
+                        string_list!(vec![strings.get("deal-2"), strings.get("deal-4")])
+                    ))
+                ),
+                value!(one_of!(
+                    &attributes,
+                    "deal_ids",
+                    string_list!(vec![strings.get("deal-1"), strings.get("deal-3")])
                 ))
             )),
             parsed
@@ -1102,17 +789,11 @@ mod tests {
         let parsed = parse(r##"not exchange_id > 2"##, &attributes, &mut strings);
 
         assert_eq!(
-            Ok(Node::Not(Box::new(Node::Value(
-                Predicate::new(
-                    &attributes,
-                    "exchange_id",
-                    PredicateKind::Comparison(
-                        ComparisonOperator::GreaterThan,
-                        ComparisonValue::Integer(2)
-                    )
-                )
-                .unwrap()
-            )),)),
+            Ok(not!(value!(greater_than!(
+                &attributes,
+                "exchange_id",
+                comparison_integer!(2)
+            )))),
             parsed
         );
     }
@@ -1124,12 +805,7 @@ mod tests {
 
         let parsed = parse(r##"private"##, &attributes, &mut strings);
 
-        assert_eq!(
-            Ok(Node::Value(
-                Predicate::new(&attributes, "private", PredicateKind::Variable).unwrap()
-            )),
-            parsed
-        );
+        assert_eq!(Ok(value!(variable!(&attributes, "private"))), parsed);
     }
 
     #[test]
@@ -1144,132 +820,70 @@ mod tests {
         );
 
         assert_eq!(
-            Ok(Node::And(
-                Box::new(Node::And(
-                    Box::new(Node::And(
-                        Box::new(Node::And(
-                            Box::new(Node::And(
-                                Box::new(Node::And(
-                                    Box::new(Node::Or(
-                                        Box::new(Node::And(
-                                            Box::new(Node::And(
-                                                Box::new(Node::Value(
-                                                    Predicate::new(
-                                                        &attributes,
-                                                        "exchange_id",
-                                                        PredicateKind::Equality(
-                                                            EqualityOperator::Equal,
-                                                            PrimitiveLiteral::Integer(1)
-                                                        )
-                                                    )
-                                                    .unwrap()
-                                                )),
-                                                Box::new(Node::Value(
-                                                    Predicate::new(
-                                                        &attributes,
-                                                        "private",
-                                                        PredicateKind::Variable
-                                                    )
-                                                    .unwrap()
-                                                ))
-                                            )),
-                                            Box::new(Node::Value(
-                                                Predicate::new(
+            Ok(and!(
+                and!(
+                    and!(
+                        and!(
+                            and!(
+                                and!(
+                                    or!(
+                                        and!(
+                                            and!(
+                                                value!(equal!(
                                                     &attributes,
-                                                    "deal_ids",
-                                                    PredicateKind::List(
-                                                        ListOperator::OneOf,
-                                                        ListLiteral::StringList(vec![
-                                                            strings.get("deal-1"),
-                                                            strings.get("deal-2")
-                                                        ])
-                                                    )
-                                                )
-                                                .unwrap()
-                                            ))
-                                        )),
-                                        Box::new(Node::Value(
-                                            Predicate::new(
+                                                    "exchange_id",
+                                                    primitive_integer!(1)
+                                                )),
+                                                value!(variable!(&attributes, "private"))
+                                            ),
+                                            value!(one_of!(
                                                 &attributes,
-                                                "exchange_id",
-                                                PredicateKind::Equality(
-                                                    EqualityOperator::Equal,
-                                                    PrimitiveLiteral::Integer(2)
-                                                )
-                                            )
-                                            .unwrap()
-                                        ))
-                                    )),
-                                    Box::new(Node::Value(
-                                        Predicate::new(
+                                                "deal_ids",
+                                                string_list!(vec![
+                                                    strings.get("deal-1"),
+                                                    strings.get("deal-2")
+                                                ])
+                                            ))
+                                        ),
+                                        value!(equal!(
                                             &attributes,
-                                            "private",
-                                            PredicateKind::Variable
-                                        )
-                                        .unwrap()
-                                    ))
-                                )),
-                                Box::new(Node::Value(
-                                    Predicate::new(
-                                        &attributes,
-                                        "deal_ids",
-                                        PredicateKind::List(
-                                            ListOperator::OneOf,
-                                            ListLiteral::StringList(vec![
-                                                strings.get("deal-3"),
-                                                strings.get("deal-4")
-                                            ])
-                                        )
-                                    )
-                                    .unwrap()
-                                ))
-                            )),
-                            Box::new(Node::Value(
-                                Predicate::new(
+                                            "exchange_id",
+                                            primitive_integer!(2)
+                                        ))
+                                    ),
+                                    value!(variable!(&attributes, "private"))
+                                ),
+                                value!(one_of!(
                                     &attributes,
-                                    "segment_ids",
-                                    PredicateKind::List(
-                                        ListOperator::OneOf,
-                                        ListLiteral::IntegerList(vec![1, 2, 3, 4, 5, 6])
-                                    )
-                                )
-                                .unwrap()
-                            ))
-                        )),
-                        Box::new(Node::Value(
-                            Predicate::new(
+                                    "deal_ids",
+                                    string_list!(vec![
+                                        strings.get("deal-3"),
+                                        strings.get("deal-4")
+                                    ])
+                                ))
+                            ),
+                            value!(one_of!(
                                 &attributes,
-                                "continent",
-                                PredicateKind::Set(
-                                    SetOperator::In,
-                                    ListLiteral::StringList(vec![strings.get("NA")])
-                                )
-                            )
-                            .unwrap()
-                        ))
-                    )),
-                    Box::new(Node::Value(
-                        Predicate::new(
+                                "segment_ids",
+                                integer_list!(vec![1, 2, 3, 4, 5, 6])
+                            ))
+                        ),
+                        value!(set_in!(
                             &attributes,
-                            "country",
-                            PredicateKind::Set(
-                                SetOperator::In,
-                                ListLiteral::StringList(vec![strings.get("CA"), strings.get("US")])
-                            )
-                        )
-                        .unwrap()
-                    ))
-                )),
-                Box::new(Node::Value(
-                    Predicate::new(
+                            "continent",
+                            string_list!(vec![strings.get("NA")])
+                        ))
+                    ),
+                    value!(set_in!(
                         &attributes,
-                        "city",
-                        PredicateKind::Set(
-                            SetOperator::In,
-                            ListLiteral::StringList(vec![strings.get("QC"), strings.get("TN")])
-                        )
-                    )
-                    .unwrap()
+                        "country",
+                        string_list!(vec![strings.get("CA"), strings.get("US")])
+                    ))
+                ),
+                value!(set_in!(
+                    &attributes,
+                    "city",
+                    string_list!(vec![strings.get("QC"), strings.get("TN")])
                 ))
             )),
             parsed

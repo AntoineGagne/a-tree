@@ -43,7 +43,7 @@ impl Node {
     pub fn cost(&self) -> u64 {
         match self {
             Self::And(left, right) | Self::Or(left, right) => left.cost() + right.cost(),
-            Self::Not(node) => node.cost(),
+            Self::Not(node) => node.cost() + 1,
             Self::Value(node) => node.cost(),
         }
     }

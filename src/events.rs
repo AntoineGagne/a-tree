@@ -176,7 +176,7 @@ impl<'atree> EventBuilder<'atree> {
 
 /// An event that can be used by the [`crate::atree::ATree`] structure to match arbitrary boolean
 /// expressions
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Event(Vec<AttributeValue>);
 
 impl Index<AttributeId> for Event {

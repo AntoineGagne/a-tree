@@ -49,6 +49,8 @@ pub enum Token<'source> {
     IsNotNull,
     #[token("is empty")]
     IsEmpty,
+    #[token("is not empty")]
+    IsNotEmpty,
     #[token("and")]
     #[token("&&")]
     And,
@@ -217,6 +219,12 @@ mod tests {
     fn can_lex_is_empty() {
         let actual = lex_tokens("is empty").unwrap();
         assert_eq!(vec![Token::IsEmpty], actual);
+    }
+
+    #[test]
+    fn can_lex_is_not_empty() {
+        let actual = lex_tokens("is not empty").unwrap();
+        assert_eq!(vec![Token::IsNotEmpty], actual);
     }
 
     #[test]

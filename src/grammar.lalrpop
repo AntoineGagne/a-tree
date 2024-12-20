@@ -170,6 +170,13 @@ NullExpression: ast::Node = {
             left,
             predicates::PredicateKind::Null(predicates::NullOperator::IsEmpty)
         ).map(ast::Node::Value).map_err(|error| ParseError::User { error: ParserError::Event(error) })
+    },
+    <left:"identifier"> "is_not_empty" =>? {
+        predicates::Predicate::new(
+            attributes,
+            left,
+            predicates::PredicateKind::Null(predicates::NullOperator::IsNotEmpty)
+        ).map(ast::Node::Value).map_err(|error| ParseError::User { error: ParserError::Event(error) })
     }
 }
 
@@ -263,6 +270,7 @@ extern {
         "is_null" => Token::IsNull,
         "is_not_null" => Token::IsNotNull,
         "is_empty" => Token::IsEmpty,
+        "is_not_empty" => Token::IsNotEmpty,
         "and" => Token::And,
         "or" => Token::Or,
         "integer" => Token::IntegerLiteral(<i64>),

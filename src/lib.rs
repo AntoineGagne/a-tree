@@ -51,7 +51,7 @@
 //! * Boolean operators: `and` (`&&`), `or` (`||`), `not` (`!`) and `variable` where `variable` is a defined attribute for the A-Tree;
 //! * Comparison: `<`, `<=`, `>`, `>=`. They work for `integer` and `float`;
 //! * Equality: `=` and `<>`. They work for `integer`, `float` and `string`;
-//! * Null: `is null`, `is not null` (for variables) and `is empty` (for lists);
+//! * Null: `is null`, `is not null` (for variables), `is empty` and `is not empty` (for lists);
 //! * Set: `in` and `not in`. They work for list of `integer` or for list of `string`;
 //! * List: `one of`, `none of` and `all of`. They work for list of `integer` and list of `string`.
 //!
@@ -87,6 +87,8 @@ mod lexer;
 mod parser;
 mod predicates;
 mod strings;
+#[cfg(test)]
+mod test_utils;
 
 pub use crate::{
     atree::{ATree, Report},

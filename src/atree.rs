@@ -97,6 +97,7 @@ impl<T: Eq + Hash + Clone> ATree<T> {
     pub fn insert<'a>(&'a mut self, user_id: &T, abe: &'a str) -> Result<(), ATreeError<'a>> {
         let ast = parser::parse(abe, &self.attributes, &mut self.strings)
             .map_err(ATreeError::ParseError)?;
+        let ast = ast.optimize();
         self.insert_root(user_id, ast);
         Ok(())
     }

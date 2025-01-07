@@ -339,7 +339,7 @@ impl<T: Eq + Hash + Clone> ATree<T> {
         }
     }
 
-    pub fn to_dot(&self) -> String {
+    pub fn to_graphviz(&self) -> String {
         const DEFAULT_CAPACITY: usize = 100_000;
         let mut builder = String::with_capacity(DEFAULT_CAPACITY);
         builder.push_str("digraph {\n");

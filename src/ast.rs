@@ -47,7 +47,7 @@ impl OptimizedNode {
     #[inline]
     pub fn cost(&self) -> u64 {
         match self {
-            Self::And(left, right) | Self::Or(left, right) => left.cost() + right.cost(),
+            Self::And(left, right) | Self::Or(left, right) => left.cost() + right.cost() + 1,
             Self::Value(node) => node.cost(),
         }
     }

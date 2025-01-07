@@ -66,12 +66,14 @@ impl Node {
             (Self::Not(value), true) => value.zero_suppression_filter(false),
             (Self::Not(value), false) => value.zero_suppression_filter(true),
             (Self::Value(predicate), true) => Self::Value(!predicate),
-            (Self::And(left, right), false) => {
-                Self::And(Box::new(left.optimize()), Box::new(right.optimize()))
-            }
-            (Self::Or(left, right), false) => {
-                Self::Or(Box::new(left.optimize()), Box::new(right.optimize()))
-            }
+            (Self::And(left, right), false) => Self::And(
+                Box::new(left.zero_suppression_filter(false)),
+                Box::new(right.zero_suppression_filter(false)),
+            ),
+            (Self::Or(left, right), false) => Self::Or(
+                Box::new(left.zero_suppression_filter(false)),
+                Box::new(right.zero_suppression_filter(false)),
+            ),
             (value @ Self::Value(_), _) => value,
         }
     }

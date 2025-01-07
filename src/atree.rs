@@ -1258,4 +1258,25 @@ mod tests {
         let results = atree.search(event).unwrap().matches().to_vec();
         assert!(results.is_empty());
     }
+
+    #[test]
+    fn can_render_to_graphviz() {
+        let definitions = [
+            AttributeDefinition::boolean("private"),
+            AttributeDefinition::integer("exchange_id"),
+            AttributeDefinition::string_list("deal_ids"),
+            AttributeDefinition::string_list("deals"),
+            AttributeDefinition::integer_list("segment_ids"),
+            AttributeDefinition::string("country"),
+            AttributeDefinition::string("city"),
+        ];
+        let an_expression = "private or exchange_id = 1";
+        let another_expression =
+            r#"private or exchange_id = 1 or deal_ids one of ["deal-1", "deal-2"]"#;
+        let mut atree = ATree::new(&definitions).unwrap();
+        atree.insert(&1u64, an_expression).unwrap();
+        atree.insert(&2u64, another_expression).unwrap();
+
+        assert!(!atree.to_graphviz().is_empty());
+    }
 }

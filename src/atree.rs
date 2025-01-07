@@ -106,7 +106,7 @@ impl<T: Eq + Hash + Clone> ATree<T> {
         Ok(())
     }
 
-    fn insert_root(&mut self, subscription_id: &T, root: Node) {
+    fn insert_root(&mut self, subscription_id: &T, root: OptimizedNode) {
         let expression_id = root.id();
         if let Some(node_id) = self.expression_to_node.get(&expression_id) {
             add_subscription_id(
@@ -119,10 +119,10 @@ impl<T: Eq + Hash + Clone> ATree<T> {
             return;
         }
 
-        let is_and = matches!(&root, Node::And(_, _));
+        let is_and = matches!(&root, OptimizedNode::And(_, _));
         let cost = root.cost();
         let node_id = match root {
-            Node::And(left, right) | Node::Or(left, right) => {
+            OptimizedNode::And(left, right) | OptimizedNode::Or(left, right) => {
                 let left_id = self.insert_node(*left);
                 let right_id = self.insert_node(*right);
                 let left_entry = &self.nodes[left_id];
@@ -148,26 +148,7 @@ impl<T: Eq + Hash + Clone> ATree<T> {
                 add_parent(&mut self.nodes[right_id], node_id);
                 node_id
             }
-            Node::Not(child) => {
-                let child_id = self.insert_node(*child);
-                let entry = &self.nodes[child_id];
-                let rnode = ATreeNode::RNode(RNode {
-                    level: 1 + entry.node.level(),
-                    operator: Operator::Not,
-                    children: vec![child_id],
-                });
-                let node_id = insert_node(
-                    &mut self.expression_to_node,
-                    &mut self.nodes,
-                    &expression_id,
-                    rnode,
-                    Some(subscription_id.clone()),
-                    cost,
-                );
-                add_parent(&mut self.nodes[child_id], node_id);
-                node_id
-            }
-            Node::Value(value) => {
+            OptimizedNode::Value(value) => {
                 let lnode = ATreeNode::lnode(&value);
                 let node_id = insert_node(
                     &mut self.expression_to_node,
@@ -186,7 +167,7 @@ impl<T: Eq + Hash + Clone> ATree<T> {
         self.max_level = get_max_level(&self.roots, &self.nodes);
     }
 
-    fn insert_node(&mut self, node: Node) -> NodeId {
+    fn insert_node(&mut self, node: OptimizedNode) -> NodeId {
         let expression_id = node.id();
         if let Some(node_id) = self.expression_to_node.get(&expression_id) {
             change_rnode_to_inode(*node_id, &mut self.nodes);
@@ -194,10 +175,10 @@ impl<T: Eq + Hash + Clone> ATree<T> {
             return *node_id;
         }
 
-        let is_and = matches!(node, Node::And(_, _));
+        let is_and = matches!(node, OptimizedNode::And(_, _));
         let cost = node.cost();
         match node {
-            Node::And(left, right) | Node::Or(left, right) => {
+            OptimizedNode::And(left, right) | OptimizedNode::Or(left, right) => {
                 let left_id = self.insert_node(*left);
                 let right_id = self.insert_node(*right);
                 let left_entry = &self.nodes[left_id];
@@ -225,27 +206,7 @@ impl<T: Eq + Hash + Clone> ATree<T> {
                 add_parent(&mut self.nodes[right_id], node_id);
                 node_id
             }
-            Node::Not(node) => {
-                let child_id = self.insert_node(*node);
-                let entry = &self.nodes[child_id];
-                let inode = ATreeNode::INode(INode {
-                    parents: vec![],
-                    level: 1 + entry.node.level(),
-                    operator: Operator::Not,
-                    children: vec![child_id],
-                });
-                let node_id = insert_node(
-                    &mut self.expression_to_node,
-                    &mut self.nodes,
-                    &expression_id,
-                    inode,
-                    None,
-                    cost,
-                );
-                add_parent(&mut self.nodes[child_id], node_id);
-                node_id
-            }
-            Node::Value(node) => {
+            OptimizedNode::Value(node) => {
                 let lnode = ATreeNode::lnode(&node);
                 let node_id = insert_node(
                     &mut self.expression_to_node,
@@ -585,13 +546,6 @@ fn evaluate_node<T>(
     let result = match operator {
         Operator::And => evaluate_and(node.children(), event, nodes, results),
         Operator::Or => evaluate_or(node.children(), event, nodes, results),
-        Operator::Not => {
-            let child_id = node
-                .children()
-                .first()
-                .unwrap_or_else(|| panic!("trying to extract from empty not"));
-            lazy_evaluate(*child_id, event, nodes, results).map(|result| !result)
-        }
     };
     results.set_result(node_id, result);
     result

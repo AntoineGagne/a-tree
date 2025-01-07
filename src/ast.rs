@@ -11,14 +11,20 @@ pub enum Node {
     Value(Predicate),
 }
 
+#[derive(PartialEq, Clone, Debug)]
+pub enum OptimizedNode {
+    And(Box<OptimizedNode>, Box<OptimizedNode>),
+    Or(Box<OptimizedNode>, Box<OptimizedNode>),
+    Value(Predicate),
+}
+
 #[derive(Debug, Hash, Clone, Eq, PartialEq)]
 pub enum Operator {
     And,
     Or,
-    Not,
 }
 
-impl Node {
+impl OptimizedNode {
     #[inline]
     pub fn id(&self) -> u64 {
         // TODO: Even though the paper specifies that way of computing the ID, I feel as though
@@ -34,7 +40,6 @@ impl Node {
         match self {
             Self::And(left, right) => u64::wrapping_mul(left.id(), right.id()),
             Self::Or(left, right) => u64::wrapping_add(left.id(), right.id()),
-            Self::Not(node) => !node.id(),
             Self::Value(node) => node.id(),
         }
     }
@@ -43,38 +48,39 @@ impl Node {
     pub fn cost(&self) -> u64 {
         match self {
             Self::And(left, right) | Self::Or(left, right) => left.cost() + right.cost(),
-            Self::Not(node) => node.cost() + 1,
             Self::Value(node) => node.cost(),
         }
     }
+}
 
+impl Node {
     #[inline]
-    pub fn optimize(self) -> Self {
+    pub fn optimize(self) -> OptimizedNode {
         self.zero_suppression_filter(false)
     }
 
-    pub fn zero_suppression_filter(self, negate: bool) -> Self {
+    pub fn zero_suppression_filter(self, negate: bool) -> OptimizedNode {
         match (self, negate) {
-            (Self::And(left, right), true) => Self::Or(
+            (Self::And(left, right), true) => OptimizedNode::Or(
                 Box::new(left.zero_suppression_filter(true)),
                 Box::new(right.zero_suppression_filter(true)),
             ),
-            (Self::Or(left, right), true) => Self::And(
+            (Self::Or(left, right), true) => OptimizedNode::And(
                 Box::new(left.zero_suppression_filter(true)),
                 Box::new(right.zero_suppression_filter(true)),
             ),
             (Self::Not(value), true) => value.zero_suppression_filter(false),
             (Self::Not(value), false) => value.zero_suppression_filter(true),
-            (Self::Value(predicate), true) => Self::Value(!predicate),
-            (Self::And(left, right), false) => Self::And(
+            (Self::Value(predicate), true) => OptimizedNode::Value(!predicate),
+            (Self::And(left, right), false) => OptimizedNode::And(
                 Box::new(left.zero_suppression_filter(false)),
                 Box::new(right.zero_suppression_filter(false)),
             ),
-            (Self::Or(left, right), false) => Self::Or(
+            (Self::Or(left, right), false) => OptimizedNode::Or(
                 Box::new(left.zero_suppression_filter(false)),
                 Box::new(right.zero_suppression_filter(false)),
             ),
-            (value @ Self::Value(_), _) => value,
+            (Self::Value(predicate), _) => OptimizedNode::Value(predicate),
         }
     }
 }
@@ -86,7 +92,10 @@ mod tests {
     use crate::{
         events::{AttributeDefinition, AttributeTable},
         predicates::PredicateKind,
-        test_utils::ast::{and, not, or, value},
+        test_utils::{
+            ast::{and, not, or, value},
+            optimized_node,
+        },
     };
 
     #[test]
@@ -98,7 +107,10 @@ mod tests {
             value!(!a_predicate.clone())
         ));
         assert_eq!(
-            and!(value!(!a_predicate.clone()), value!(a_predicate)),
+            optimized_node::and!(
+                optimized_node::value!(!a_predicate.clone()),
+                optimized_node::value!(a_predicate)
+            ),
             expression.optimize()
         );
     }
@@ -114,7 +126,10 @@ mod tests {
         ));
 
         assert_eq!(
-            or!(value!(!a_predicate.clone()), value!(a_predicate)),
+            optimized_node::or!(
+                optimized_node::value!(!a_predicate.clone()),
+                optimized_node::value!(a_predicate)
+            ),
             expression.optimize()
         );
     }
@@ -125,7 +140,7 @@ mod tests {
         let a_predicate = Predicate::new(&attributes, "private", PredicateKind::Variable).unwrap();
         let expression = not!(value!(a_predicate.clone()));
 
-        assert_eq!(value!(!a_predicate), expression.optimize());
+        assert_eq!(optimized_node::value!(!a_predicate), expression.optimize());
     }
 
     #[test]
@@ -134,7 +149,7 @@ mod tests {
         let a_predicate = Predicate::new(&attributes, "private", PredicateKind::Variable).unwrap();
         let expression = not!(not!(value!(a_predicate.clone())));
 
-        assert_eq!(value!(a_predicate), expression.optimize());
+        assert_eq!(optimized_node::value!(a_predicate), expression.optimize());
     }
 
     #[test]
@@ -153,11 +168,20 @@ mod tests {
         ));
 
         assert_eq!(
-            or!(
-                or!(value!(a_predicate.clone()), value!(a_predicate.clone())),
-                or!(
-                    and!(value!(!a_predicate.clone()), value!(!a_predicate.clone())),
-                    and!(value!(!a_predicate.clone()), value!(!a_predicate.clone()))
+            optimized_node::or!(
+                optimized_node::or!(
+                    optimized_node::value!(a_predicate.clone()),
+                    optimized_node::value!(a_predicate.clone())
+                ),
+                optimized_node::or!(
+                    optimized_node::and!(
+                        optimized_node::value!(!a_predicate.clone()),
+                        optimized_node::value!(!a_predicate.clone())
+                    ),
+                    optimized_node::and!(
+                        optimized_node::value!(!a_predicate.clone()),
+                        optimized_node::value!(!a_predicate.clone())
+                    )
                 )
             ),
             expression.optimize()
@@ -169,25 +193,40 @@ mod tests {
         let attributes = define_attributes();
         let a_predicate = Predicate::new(&attributes, "private", PredicateKind::Variable).unwrap();
 
-        assert_eq!(value!(a_predicate.clone()), value!(a_predicate).optimize());
+        assert_eq!(
+            optimized_node::value!(a_predicate.clone()),
+            value!(a_predicate).optimize()
+        );
     }
 
     #[test]
     fn leave_unnegated_and_as_is() {
         let attributes = define_attributes();
         let a_predicate = Predicate::new(&attributes, "private", PredicateKind::Variable).unwrap();
-        let expression = and!(value!(a_predicate.clone()), value!(a_predicate));
+        let expression = and!(value!(a_predicate.clone()), value!(a_predicate.clone()));
 
-        assert_eq!(expression.clone(), expression.optimize());
+        assert_eq!(
+            optimized_node::and!(
+                optimized_node::value!(a_predicate.clone()),
+                optimized_node::value!(a_predicate.clone())
+            ),
+            expression.optimize()
+        );
     }
 
     #[test]
     fn leave_unnegated_or_as_is() {
         let attributes = define_attributes();
         let a_predicate = Predicate::new(&attributes, "private", PredicateKind::Variable).unwrap();
-        let expression = or!(value!(a_predicate.clone()), value!(a_predicate));
+        let expression = or!(value!(a_predicate.clone()), value!(a_predicate.clone()));
 
-        assert_eq!(expression.clone(), expression.optimize());
+        assert_eq!(
+            optimized_node::or!(
+                optimized_node::value!(a_predicate.clone()),
+                optimized_node::value!(a_predicate.clone())
+            ),
+            expression.optimize()
+        );
     }
 
     #[test]
@@ -203,9 +242,12 @@ mod tests {
         );
 
         assert_eq!(
-            and!(
-                or!(value!(!a_predicate.clone()), value!(!a_predicate.clone())),
-                value!(a_predicate)
+            optimized_node::and!(
+                optimized_node::or!(
+                    optimized_node::value!(!a_predicate.clone()),
+                    optimized_node::value!(!a_predicate.clone())
+                ),
+                optimized_node::value!(a_predicate)
             ),
             expression.optimize()
         );
@@ -224,9 +266,12 @@ mod tests {
         );
 
         assert_eq!(
-            or!(
-                and!(value!(!a_predicate.clone()), value!(!a_predicate.clone())),
-                value!(a_predicate)
+            optimized_node::or!(
+                optimized_node::and!(
+                    optimized_node::value!(!a_predicate.clone()),
+                    optimized_node::value!(!a_predicate.clone())
+                ),
+                optimized_node::value!(a_predicate)
             ),
             expression.optimize()
         );

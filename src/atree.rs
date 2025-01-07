@@ -247,8 +247,8 @@ impl<T: Eq + Hash + Clone> ATree<T> {
             &mut queues,
         );
 
-        for current in 0..queues.len() {
-            while let Some((node_id, node)) = queues[current].pop() {
+        for level in 0..queues.len() {
+            while let Some((node_id, node)) = queues[level].pop() {
                 if results.is_evaluated(node_id) {
                     continue;
                 }

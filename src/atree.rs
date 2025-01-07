@@ -259,17 +259,16 @@ impl<T: Eq + Hash + Clone> ATree<T> {
                     continue;
                 }
 
-                let entry = &self.nodes[node_id];
-                if !entry.subscription_ids.is_empty() {
+                if !node.subscription_ids.is_empty() {
                     if let Some(true) = result {
-                        for subscription_id in &entry.subscription_ids {
+                        for subscription_id in &node.subscription_ids {
                             matches.push(subscription_id);
                         }
                     }
                     continue;
                 }
 
-                for parent_id in entry.parents() {
+                for parent_id in node.parents() {
                     let entry = &self.nodes[*parent_id];
                     let is_evaluated = results.is_evaluated(*parent_id);
                     if !is_evaluated

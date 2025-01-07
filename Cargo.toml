@@ -35,7 +35,7 @@ harness = false
 lalrpop = "0.22.0"
 
 [dependencies]
-itertools = "0.13"
+itertools = "0.14"
 lalrpop-util = { version = "0.22.0", features = ["lexer", "unicode"] }
 logos = "0.15"
 rust_decimal = "1.36"

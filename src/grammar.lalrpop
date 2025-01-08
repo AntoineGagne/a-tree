@@ -238,6 +238,9 @@ List<T>: Vec<T> = {
     "[" <values:Comma<T>> "]" => {
         values.into_iter().sorted().unique().collect()
     },
+    "(" <values:Comma<T>> ")" => {
+        values.into_iter().sorted().unique().collect()
+    },
 }
 
 Comma<T>: Vec<T> = {

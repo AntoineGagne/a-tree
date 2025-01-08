@@ -471,6 +471,31 @@ mod tests {
     }
 
     #[test]
+    fn can_parse_all_of_list_expression_with_parenthesis() {
+        let mut strings = StringTable::new();
+        let attributes = define_attributes();
+
+        let parsed = parse(
+            r##"deals all of ("deal-1", "deal-2", "deal-3")"##,
+            &attributes,
+            &mut strings,
+        );
+
+        assert_eq!(
+            Ok(value!(all_of!(
+                &attributes,
+                "deals",
+                string_list!(vec![
+                    strings.get("deal-1"),
+                    strings.get("deal-2"),
+                    strings.get("deal-3")
+                ])
+            ))),
+            parsed
+        );
+    }
+
+    #[test]
     fn can_parse_none_of_list_expression_with_integer_list() {
         let mut strings = StringTable::new();
         let attributes = define_attributes();

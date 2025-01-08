@@ -580,10 +580,10 @@ fn process_predicates<'a, T>(
             .iter()
             .map(|parent_id| (*parent_id, &nodes[*parent_id]))
             .for_each(|(parent_id, parent)| {
-                if !matches!(parent.operator(), Operator::And) || result.unwrap_or(false) {
-                    queues[parent.level() - 2].push((parent_id, parent));
-                } else {
+                if matches!(parent.operator(), Operator::And) && !result.unwrap_or(true) {
                     results.set_result(parent_id, Some(false));
+                } else {
+                    queues[parent.level() - 2].push((parent_id, parent));
                 }
             })
     }

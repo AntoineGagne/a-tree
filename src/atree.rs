@@ -338,6 +338,84 @@ impl<T: Eq + Hash + Clone> ATree<T> {
             }
         }
     }
+
+    pub fn to_graphviz(&self) -> String {
+        const DEFAULT_CAPACITY: usize = 100_000;
+        let mut builder = String::with_capacity(DEFAULT_CAPACITY);
+        builder.push_str("digraph {\n");
+        builder.push_str(r#"concentrate = true;"#);
+        builder.push_str(r#"node [shape = "record"];"#);
+        builder.push('\n');
+        let mut inodes = Vec::with_capacity(self.nodes.len());
+        let mut lnodes = Vec::with_capacity(self.nodes.len());
+        let mut rnodes = Vec::with_capacity(self.nodes.len());
+        let mut relations = Vec::with_capacity(DEFAULT_CAPACITY);
+        for (id, entry) in &self.nodes {
+            match &entry.node {
+                ATreeNode::LNode(LNode { parents, .. }) => {
+                    lnodes.push(format!(
+                        r#"node_{id} [label = "{{{id} | l-node}}", style = "rounded"];"#
+                    ));
+                    for parent_id in parents {
+                        relations.push(format!("node_{id} -> node_{parent_id};\n"));
+                    }
+                }
+                ATreeNode::INode(INode {
+                    children,
+                    parents,
+                    operator,
+                    ..
+                }) => {
+                    inodes.push(format!(
+                        r#"node_{id} [label = "{{{id} | {operator:#?} | i-node}}"];"#
+                    ));
+                    for parent_id in parents {
+                        relations.push(format!("node_{id} -> node_{parent_id};\n"));
+                    }
+
+                    for child_id in children {
+                        relations.push(format!("node_{id} -> node_{child_id};\n"));
+                    }
+                }
+                ATreeNode::RNode(RNode {
+                    children, operator, ..
+                }) => {
+                    rnodes.push(format!(
+                        r#"node_{id} [label = "{{{id} | {operator:#?} | r-node}}"];"#
+                    ));
+                    for child_id in children {
+                        relations.push(format!("node_{id} -> node_{child_id};\n"));
+                    }
+                }
+            }
+        }
+
+        builder.push_str("\n// r-nodes\n");
+        for rnode in rnodes {
+            builder.push_str(&rnode);
+            builder.push('\n');
+        }
+
+        builder.push_str("\n// i-nodes\n");
+        for inode in inodes {
+            builder.push_str(&inode);
+            builder.push('\n');
+        }
+
+        builder.push_str("\n// l-nodes\n");
+        for lnode in lnodes {
+            builder.push_str(&lnode);
+            builder.push('\n');
+        }
+
+        builder.push_str("\n// edges\n");
+        for relation in relations {
+            builder.push_str(&relation);
+        }
+
+        builder.push('}');
+        builder
+    }
 }
 
 #[inline]
@@ -1179,5 +1257,26 @@ mod tests {
         let event = builder.build().unwrap();
         let results = atree.search(event).unwrap().matches().to_vec();
         assert!(results.is_empty());
+    }
+
+    #[test]
+    fn can_render_to_graphviz() {
+        let definitions = [
+            AttributeDefinition::boolean("private"),
+            AttributeDefinition::integer("exchange_id"),
+            AttributeDefinition::string_list("deal_ids"),
+            AttributeDefinition::string_list("deals"),
+            AttributeDefinition::integer_list("segment_ids"),
+            AttributeDefinition::string("country"),
+            AttributeDefinition::string("city"),
+        ];
+        let an_expression = "private or exchange_id = 1";
+        let another_expression =
+            r#"private or exchange_id = 1 or deal_ids one of ["deal-1", "deal-2"]"#;
+        let mut atree = ATree::new(&definitions).unwrap();
+        atree.insert(&1u64, an_expression).unwrap();
+        atree.insert(&2u64, another_expression).unwrap();
+
+        assert!(!atree.to_graphviz().is_empty());
     }
 }

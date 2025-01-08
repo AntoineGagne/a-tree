@@ -77,7 +77,13 @@
 //!     * variable substitution/null checks/empty checks < set operations < lists operations
 //!     * the length of the lists has an impact on that cost too for set operations and lists
 //!       operations;
-//! * Evaluate the predicates lazily while searching.
+//!     * the cost of binary boolean operators (OR and AND) are the combined cost of their
+//!       sub-expressions;
+//! * Evaluate the predicates lazily while searching;
+//! * _Zero suppression filter_: Reduce the amount of nodes to evaluate by applying
+//!   De Morgan's laws and eliminating the NOT nodes;
+//! * _Propagation on demand_: Choose an access child for the AND operators and only
+//!   propagate the result if the access child is true.
 mod ast;
 mod atree;
 mod error;

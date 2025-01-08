@@ -29,6 +29,30 @@ pub mod ast {
     pub(crate) use value;
 }
 
+pub mod optimized_node {
+    macro_rules! or {
+        ($left:expr, $right:expr) => {
+            OptimizedNode::Or(Box::new($left), Box::new($right))
+        };
+    }
+
+    macro_rules! and {
+        ($left:expr, $right:expr) => {
+            OptimizedNode::And(Box::new($left), Box::new($right))
+        };
+    }
+
+    macro_rules! value {
+        ($value:expr) => {
+            OptimizedNode::Value($value)
+        };
+    }
+
+    pub(crate) use and;
+    pub(crate) use or;
+    pub(crate) use value;
+}
+
 pub mod predicates {
     macro_rules! variable {
         ($attributes:expr, $name:expr) => {

@@ -94,26 +94,35 @@ impl<T: Eq + Hash + Clone> ATree<T> {
     /// assert!(atree.insert(&2u64, "private").is_ok());
     /// ```
     #[inline]
-    pub fn insert<'a>(&'a mut self, user_id: &T, abe: &'a str) -> Result<(), ATreeError<'a>> {
+    pub fn insert<'a>(
+        &'a mut self,
+        subscription_id: &T,
+        abe: &'a str,
+    ) -> Result<(), ATreeError<'a>> {
         let ast = parser::parse(abe, &self.attributes, &mut self.strings)
             .map_err(ATreeError::ParseError)?;
         let ast = ast.optimize();
-        self.insert_root(user_id, ast);
+        self.insert_root(subscription_id, ast);
         Ok(())
     }
 
-    fn insert_root(&mut self, user_id: &T, root: Node) {
+    fn insert_root(&mut self, subscription_id: &T, root: OptimizedNode) {
         let expression_id = root.id();
         if let Some(node_id) = self.expression_to_node.get(&expression_id) {
-            add_user_id(user_id, *node_id, &mut self.nodes, &mut self.nodes_by_ids);
+            add_subscription_id(
+                subscription_id,
+                *node_id,
+                &mut self.nodes,
+                &mut self.nodes_by_ids,
+            );
             increment_use_count(*node_id, &mut self.nodes);
             return;
         }
 
-        let is_and = matches!(&root, Node::And(_, _));
+        let is_and = matches!(&root, OptimizedNode::And(_, _));
         let cost = root.cost();
         let node_id = match root {
-            Node::And(left, right) | Node::Or(left, right) => {
+            OptimizedNode::And(left, right) | OptimizedNode::Or(left, right) => {
                 let left_id = self.insert_node(*left);
                 let right_id = self.insert_node(*right);
                 let left_entry = &self.nodes[left_id];
@@ -132,52 +141,45 @@ impl<T: Eq + Hash + Clone> ATree<T> {
                     &mut self.nodes,
                     &expression_id,
                     rnode,
-                    Some(user_id.clone()),
+                    Some(subscription_id.clone()),
                     cost,
                 );
-                add_parent(&mut self.nodes[left_id], node_id);
-                add_parent(&mut self.nodes[right_id], node_id);
+                if is_and {
+                    choose_access_child(
+                        left_id,
+                        right_id,
+                        node_id,
+                        &mut self.nodes,
+                        &mut self.predicates,
+                    );
+                } else {
+                    add_parent(&mut self.nodes[left_id], node_id);
+                    add_parent(&mut self.nodes[right_id], node_id);
+                    add_predicate(left_id, &self.nodes, &mut self.predicates);
+                    add_predicate(right_id, &self.nodes, &mut self.predicates);
+                }
                 node_id
             }
-            Node::Not(child) => {
-                let child_id = self.insert_node(*child);
-                let entry = &self.nodes[child_id];
-                let rnode = ATreeNode::RNode(RNode {
-                    level: 1 + entry.node.level(),
-                    operator: Operator::Not,
-                    children: vec![child_id],
-                });
-                let node_id = insert_node(
-                    &mut self.expression_to_node,
-                    &mut self.nodes,
-                    &expression_id,
-                    rnode,
-                    Some(user_id.clone()),
-                    cost,
-                );
-                add_parent(&mut self.nodes[child_id], node_id);
-                node_id
-            }
-            Node::Value(value) => {
+            OptimizedNode::Value(value) => {
                 let lnode = ATreeNode::lnode(&value);
                 let node_id = insert_node(
                     &mut self.expression_to_node,
                     &mut self.nodes,
                     &expression_id,
                     lnode,
-                    Some(user_id.clone()),
+                    Some(subscription_id.clone()),
                     cost,
                 );
                 self.predicates.push(node_id);
                 node_id
             }
         };
-        self.nodes_by_ids.insert(user_id.clone(), node_id);
+        self.nodes_by_ids.insert(subscription_id.clone(), node_id);
         self.roots.push(node_id);
         self.max_level = get_max_level(&self.roots, &self.nodes);
     }
 
-    fn insert_node(&mut self, node: Node) -> NodeId {
+    fn insert_node(&mut self, node: OptimizedNode) -> NodeId {
         let expression_id = node.id();
         if let Some(node_id) = self.expression_to_node.get(&expression_id) {
             change_rnode_to_inode(*node_id, &mut self.nodes);
@@ -185,10 +187,10 @@ impl<T: Eq + Hash + Clone> ATree<T> {
             return *node_id;
         }
 
-        let is_and = matches!(node, Node::And(_, _));
+        let is_and = matches!(node, OptimizedNode::And(_, _));
         let cost = node.cost();
         match node {
-            Node::And(left, right) | Node::Or(left, right) => {
+            OptimizedNode::And(left, right) | OptimizedNode::Or(left, right) => {
                 let left_id = self.insert_node(*left);
                 let right_id = self.insert_node(*right);
                 let left_entry = &self.nodes[left_id];
@@ -212,42 +214,32 @@ impl<T: Eq + Hash + Clone> ATree<T> {
                     None,
                     cost,
                 );
-                add_parent(&mut self.nodes[left_id], node_id);
-                add_parent(&mut self.nodes[right_id], node_id);
+                if is_and {
+                    choose_access_child(
+                        left_id,
+                        right_id,
+                        node_id,
+                        &mut self.nodes,
+                        &mut self.predicates,
+                    );
+                } else {
+                    add_parent(&mut self.nodes[left_id], node_id);
+                    add_parent(&mut self.nodes[right_id], node_id);
+                    add_predicate(left_id, &self.nodes, &mut self.predicates);
+                    add_predicate(right_id, &self.nodes, &mut self.predicates);
+                }
                 node_id
             }
-            Node::Not(node) => {
-                let child_id = self.insert_node(*node);
-                let entry = &self.nodes[child_id];
-                let inode = ATreeNode::INode(INode {
-                    parents: vec![],
-                    level: 1 + entry.node.level(),
-                    operator: Operator::Not,
-                    children: vec![child_id],
-                });
-                let node_id = insert_node(
-                    &mut self.expression_to_node,
-                    &mut self.nodes,
-                    &expression_id,
-                    inode,
-                    None,
-                    cost,
-                );
-                add_parent(&mut self.nodes[child_id], node_id);
-                node_id
-            }
-            Node::Value(node) => {
+            OptimizedNode::Value(node) => {
                 let lnode = ATreeNode::lnode(&node);
-                let node_id = insert_node(
+                insert_node(
                     &mut self.expression_to_node,
                     &mut self.nodes,
                     &expression_id,
                     lnode,
                     None,
                     cost,
-                );
-                self.predicates.push(node_id);
-                node_id
+                )
             }
         }
     }
@@ -277,8 +269,8 @@ impl<T: Eq + Hash + Clone> ATree<T> {
             &mut queues,
         );
 
-        for current in 0..queues.len() {
-            while let Some((node_id, node)) = queues[current].pop() {
+        for level in 0..queues.len() {
+            while let Some((node_id, node)) = queues[level].pop() {
                 if results.is_evaluated(node_id) {
                     continue;
                 }
@@ -289,19 +281,27 @@ impl<T: Eq + Hash + Clone> ATree<T> {
                     continue;
                 }
 
-                let entry = &self.nodes[node_id];
-                if !entry.user_ids.is_empty() {
+                if !node.subscription_ids.is_empty() {
                     if let Some(true) = result {
-                        for user_id in &entry.user_ids {
-                            matches.push(user_id);
+                        for subscription_id in &node.subscription_ids {
+                            matches.push(subscription_id);
                         }
                     }
                     continue;
                 }
 
-                for parent_id in entry.parents() {
-                    if !results.is_evaluated(*parent_id) {
-                        let entry = &self.nodes[*parent_id];
+                for parent_id in node.parents() {
+                    let entry = &self.nodes[*parent_id];
+                    let is_evaluated = results.is_evaluated(*parent_id);
+                    if !is_evaluated
+                        && matches!(entry.operator(), Operator::And)
+                        && !result.unwrap_or(true)
+                    {
+                        results.set_result(*parent_id, Some(false));
+                        continue;
+                    }
+
+                    if !is_evaluated {
                         queues[entry.level() - 2].push((*parent_id, entry));
                     }
                 }
@@ -320,9 +320,9 @@ impl<T: Eq + Hash + Clone> ATree<T> {
     }
 
     #[inline]
-    fn delete_node(&mut self, user_id: &T, node_id: NodeId) {
+    fn delete_node(&mut self, subscription_id: &T, node_id: NodeId) {
         let children = decrement_use_count(
-            user_id,
+            subscription_id,
             node_id,
             &mut self.nodes,
             &mut self.expression_to_node,
@@ -334,7 +334,7 @@ impl<T: Eq + Hash + Clone> ATree<T> {
 
         if let Some(children) = children {
             for child in children {
-                self.delete_node(user_id, child);
+                self.delete_node(subscription_id, child);
             }
         }
     }
@@ -357,7 +357,7 @@ impl<T: Eq + Hash + Clone> ATree<T> {
                         r#"node_{id} [label = "{{{id} | l-node}}", style = "rounded"];"#
                     ));
                     for parent_id in parents {
-                        relations.push(format!("node_{id} -> node_{parent_id};\n"));
+                        relations.push(format!("node_{id} -> node_{parent_id};"));
                     }
                 }
                 ATreeNode::INode(INode {
@@ -370,11 +370,11 @@ impl<T: Eq + Hash + Clone> ATree<T> {
                         r#"node_{id} [label = "{{{id} | {operator:#?} | i-node}}"];"#
                     ));
                     for parent_id in parents {
-                        relations.push(format!("node_{id} -> node_{parent_id};\n"));
+                        relations.push(format!("node_{id} -> node_{parent_id};"));
                     }
 
                     for child_id in children {
-                        relations.push(format!("node_{id} -> node_{child_id};\n"));
+                        relations.push(format!("node_{id} -> node_{child_id};"));
                     }
                 }
                 ATreeNode::RNode(RNode {
@@ -384,7 +384,7 @@ impl<T: Eq + Hash + Clone> ATree<T> {
                         r#"node_{id} [label = "{{{id} | {operator:#?} | r-node}}"];"#
                     ));
                     for child_id in children {
-                        relations.push(format!("node_{id} -> node_{child_id};\n"));
+                        relations.push(format!("node_{id} -> node_{child_id};"));
                     }
                 }
             }
@@ -411,6 +411,7 @@ impl<T: Eq + Hash + Clone> ATree<T> {
         builder.push_str("\n// edges\n");
         for relation in relations {
             builder.push_str(&relation);
+            builder.push('\n');
         }
 
         builder.push('}');
@@ -421,7 +422,7 @@ impl<T: Eq + Hash + Clone> ATree<T> {
 #[inline]
 #[allow(clippy::too_many_arguments)]
 fn decrement_use_count<T: Eq + Hash>(
-    user_id: &T,
+    subscription_id: &T,
     node_id: NodeId,
     nodes: &mut Slab<Entry<T>>,
     expression_to_node: &mut HashMap<ExpressionId, NodeId>,
@@ -433,8 +434,8 @@ fn decrement_use_count<T: Eq + Hash>(
     let node = &mut nodes[node_id];
     node.use_count -= 1;
     let mut children = None;
-    node.user_ids.retain(|x| *x != *user_id);
-    nodes_by_ids.remove(user_id);
+    node.subscription_ids.retain(|x| *x != *subscription_id);
+    nodes_by_ids.remove(subscription_id);
     if node.use_count == 0 {
         if !node.is_leaf() {
             children = Some(node.children().to_vec());
@@ -456,13 +457,13 @@ fn insert_node<T>(
     nodes: &mut Slab<Entry<T>>,
     expression_id: &ExpressionId,
     node: ATreeNode,
-    user_id: Option<T>,
+    subscription_id: Option<T>,
     cost: u64,
 ) -> NodeId {
-    let entry = Entry::new(*expression_id, node, user_id, cost);
+    let entry = Entry::new(*expression_id, node, subscription_id, cost);
     let node_id = nodes.insert(entry);
     if expression_to_node.insert(*expression_id, node_id).is_some() {
-        panic!("{expression_id} is already present; this is a bug");
+        unreachable!("{expression_id} is already present; this is a bug");
     }
     node_id
 }
@@ -473,14 +474,16 @@ fn add_parent<T>(entry: &mut Entry<T>, node_id: NodeId) {
 }
 
 #[inline]
-fn add_user_id<T: Eq + Hash + Clone>(
-    user_id: &T,
+fn add_subscription_id<T: Eq + Hash + Clone>(
+    subscription_id: &T,
     node_id: NodeId,
     nodes: &mut Slab<Entry<T>>,
     nodes_by_ids: &mut HashMap<T, NodeId>,
 ) {
-    nodes[node_id].user_ids.push(user_id.clone());
-    nodes_by_ids.insert(user_id.clone(), node_id);
+    nodes[node_id]
+        .subscription_ids
+        .push(subscription_id.clone());
+    nodes_by_ids.insert(subscription_id.clone(), node_id);
 }
 
 #[inline]
@@ -517,6 +520,33 @@ fn change_rnode_to_inode<T>(node_id: NodeId, nodes: &mut Slab<Entry<T>>) {
 }
 
 #[inline]
+fn choose_access_child<T>(
+    left_id: NodeId,
+    right_id: NodeId,
+    parent_id: NodeId,
+    nodes: &mut Slab<Entry<T>>,
+    predicates: &mut Vec<NodeId>,
+) {
+    let left_entry = &nodes[left_id];
+    let right_entry = &nodes[right_id];
+    let accessor_id = if left_entry.cost < right_entry.cost {
+        left_id
+    } else {
+        right_id
+    };
+    add_parent(&mut nodes[accessor_id], parent_id);
+    add_predicate(accessor_id, nodes, predicates);
+}
+
+#[inline]
+fn add_predicate<T>(node_id: NodeId, nodes: &Slab<Entry<T>>, predicates: &mut Vec<NodeId>) {
+    let entry = &nodes[node_id];
+    if entry.is_leaf() && !predicates.contains(&node_id) {
+        predicates.push(node_id);
+    }
+}
+
+#[inline]
 fn process_predicates<'a, T>(
     predicates: &[NodeId],
     nodes: &'a Slab<Entry<T>>,
@@ -527,15 +557,21 @@ fn process_predicates<'a, T>(
 ) {
     for predicate_id in predicates {
         let node = &nodes[*predicate_id];
-        // There is no point in delaying the evaluation of those predicates
-        // since they count against the top level expressions
-        if !node.user_ids.is_empty() {
-            let result = node.evaluate(event);
-            results.set_result(*predicate_id, result);
+        // The evaluation is delayed as much as possible; if the predicate has no
+        // subscribers and no parents, there is no point in evaluating eagerly and
+        // it should only be evaluated if there is a need for it.
+        let delay_evaluation = node.subscription_ids.is_empty() && node.parents().is_empty();
+        if delay_evaluation || results.is_evaluated(*predicate_id) {
+            continue;
+        }
 
+        let result = node.evaluate(event);
+        results.set_result(*predicate_id, result);
+
+        if !node.subscription_ids.is_empty() {
             if let Some(true) = result {
-                for user_id in &node.user_ids {
-                    matches.push(user_id);
+                for subscription_id in &node.subscription_ids {
+                    matches.push(subscription_id);
                 }
             }
         }
@@ -544,7 +580,11 @@ fn process_predicates<'a, T>(
             .iter()
             .map(|parent_id| (*parent_id, &nodes[*parent_id]))
             .for_each(|(parent_id, parent)| {
-                queues[parent.level() - 2].push((parent_id, parent));
+                if matches!(parent.operator(), Operator::And) && !result.unwrap_or(true) {
+                    results.set_result(parent_id, Some(false));
+                } else {
+                    queues[parent.level() - 2].push((parent_id, parent));
+                }
             })
     }
 }
@@ -561,13 +601,6 @@ fn evaluate_node<T>(
     let result = match operator {
         Operator::And => evaluate_and(node.children(), event, nodes, results),
         Operator::Or => evaluate_or(node.children(), event, nodes, results),
-        Operator::Not => {
-            let child_id = node
-                .children()
-                .first()
-                .unwrap_or_else(|| panic!("trying to extract from empty not"));
-            lazy_evaluate(*child_id, event, nodes, results).map(|result| !result)
-        }
     };
     results.set_result(node_id, result);
     result
@@ -643,27 +676,32 @@ fn lazy_evaluate<T>(
         return results.get_result(node_id);
     }
     let node = &nodes[node_id];
-    let result = node.evaluate(event);
-    results.set_result(node_id, result);
-    result
+    if node.is_leaf() {
+        let result = node.evaluate(event);
+        results.set_result(node_id, result);
+        result
+    } else {
+        evaluate_node(node_id, event, node, nodes, results)
+    }
 }
 
 #[derive(Clone, Debug)]
 struct Entry<T> {
     id: ExpressionId,
-    user_ids: Vec<T>,
+    subscription_ids: Vec<T>,
     node: ATreeNode,
     use_count: usize,
     cost: u64,
 }
 
 impl<T> Entry<T> {
-    fn new(id: ExpressionId, node: ATreeNode, user_id: Option<T>, cost: u64) -> Self {
+    fn new(id: ExpressionId, node: ATreeNode, subscription_id: Option<T>, cost: u64) -> Self {
         Self {
             id,
             node,
             use_count: 1,
-            user_ids: user_id.map_or_else(Vec::new, |user_id| vec![user_id]),
+            subscription_ids: subscription_id
+                .map_or_else(Vec::new, |subscription_id| vec![subscription_id]),
             cost,
         }
     }
@@ -1209,7 +1247,8 @@ mod tests {
     }
 
     #[test]
-    fn deleting_an_expression_only_removes_the_id_not_the_expression_if_it_has_multiple_user_ids() {
+    fn deleting_an_expression_only_removes_the_id_not_the_expression_if_it_has_multiple_subscription_ids(
+    ) {
         let definitions = [
             AttributeDefinition::boolean("private"),
             AttributeDefinition::integer("exchange_id"),

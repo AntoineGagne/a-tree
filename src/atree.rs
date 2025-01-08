@@ -339,6 +339,7 @@ impl<T: Eq + Hash + Clone> ATree<T> {
         }
     }
 
+    /// Export the [`ATree`] to the Graphviz format.
     pub fn to_graphviz(&self) -> String {
         const DEFAULT_CAPACITY: usize = 100_000;
         let mut builder = String::with_capacity(DEFAULT_CAPACITY);

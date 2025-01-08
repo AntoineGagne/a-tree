@@ -440,7 +440,7 @@ fn insert_node<T>(
     let entry = Entry::new(*expression_id, node, subscription_id, cost);
     let node_id = nodes.insert(entry);
     if expression_to_node.insert(*expression_id, node_id).is_some() {
-        panic!("{expression_id} is already present; this is a bug");
+        unreachable!("{expression_id} is already present; this is a bug");
     }
     node_id
 }

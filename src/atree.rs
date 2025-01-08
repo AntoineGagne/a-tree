@@ -313,9 +313,9 @@ impl<T: Eq + Hash + Clone> ATree<T> {
 
     #[inline]
     /// Delete the specified expression
-    pub fn delete(&mut self, id: &T) {
-        if let Some(node_id) = self.nodes_by_ids.get(id) {
-            self.delete_node(id, *node_id);
+    pub fn delete(&mut self, subscription_id: &T) {
+        if let Some(node_id) = self.nodes_by_ids.get(subscription_id) {
+            self.delete_node(subscription_id, *node_id);
         }
     }
 

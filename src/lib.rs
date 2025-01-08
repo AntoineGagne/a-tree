@@ -59,6 +59,7 @@
 //!
 //! ```text
 //! (exchange_id = 1 and deals one of ["deal-1", "deal-2", "deal-3"]) and (segment_ids one of [1, 2, 3]) and (continent = 'NA' and country in ["US", "CA"])
+//! (exchange_id = 1 and deals one of ("deal-1", "deal-2", "deal-3")) and (segment_ids one of (1, 2, 3)) and country in ("IN")
 //! (log_level = 'debug') and (month in [1, 2, 3] and day in [15, 16]) or (month in [4, 5, 6] and day in [10, 11])
 //! ```
 //!

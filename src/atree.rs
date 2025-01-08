@@ -144,8 +144,20 @@ impl<T: Eq + Hash + Clone> ATree<T> {
                     Some(subscription_id.clone()),
                     cost,
                 );
-                add_parent(&mut self.nodes[left_id], node_id);
-                add_parent(&mut self.nodes[right_id], node_id);
+                if is_and {
+                    choose_access_child(
+                        left_id,
+                        right_id,
+                        node_id,
+                        &mut self.nodes,
+                        &mut self.predicates,
+                    );
+                } else {
+                    add_parent(&mut self.nodes[left_id], node_id);
+                    add_parent(&mut self.nodes[right_id], node_id);
+                    add_predicate(left_id, &self.nodes, &mut self.predicates);
+                    add_predicate(right_id, &self.nodes, &mut self.predicates);
+                }
                 node_id
             }
             OptimizedNode::Value(value) => {
@@ -202,22 +214,32 @@ impl<T: Eq + Hash + Clone> ATree<T> {
                     None,
                     cost,
                 );
-                add_parent(&mut self.nodes[left_id], node_id);
-                add_parent(&mut self.nodes[right_id], node_id);
+                if is_and {
+                    choose_access_child(
+                        left_id,
+                        right_id,
+                        node_id,
+                        &mut self.nodes,
+                        &mut self.predicates,
+                    );
+                } else {
+                    add_parent(&mut self.nodes[left_id], node_id);
+                    add_parent(&mut self.nodes[right_id], node_id);
+                    add_predicate(left_id, &self.nodes, &mut self.predicates);
+                    add_predicate(right_id, &self.nodes, &mut self.predicates);
+                }
                 node_id
             }
             OptimizedNode::Value(node) => {
                 let lnode = ATreeNode::lnode(&node);
-                let node_id = insert_node(
+                insert_node(
                     &mut self.expression_to_node,
                     &mut self.nodes,
                     &expression_id,
                     lnode,
                     None,
                     cost,
-                );
-                self.predicates.push(node_id);
-                node_id
+                )
             }
         }
     }
@@ -273,9 +295,9 @@ impl<T: Eq + Hash + Clone> ATree<T> {
                     let is_evaluated = results.is_evaluated(*parent_id);
                     if !is_evaluated
                         && matches!(entry.operator(), Operator::And)
-                        && result.unwrap_or(false)
+                        && !result.unwrap_or(true)
                     {
-                        queues[entry.level() - 2].push((*parent_id, entry));
+                        results.set_result(*parent_id, Some(false));
                         continue;
                     }
 
@@ -335,7 +357,7 @@ impl<T: Eq + Hash + Clone> ATree<T> {
                         r#"node_{id} [label = "{{{id} | l-node}}", style = "rounded"];"#
                     ));
                     for parent_id in parents {
-                        relations.push(format!("node_{id} -> node_{parent_id};\n"));
+                        relations.push(format!("node_{id} -> node_{parent_id};"));
                     }
                 }
                 ATreeNode::INode(INode {
@@ -348,11 +370,11 @@ impl<T: Eq + Hash + Clone> ATree<T> {
                         r#"node_{id} [label = "{{{id} | {operator:#?} | i-node}}"];"#
                     ));
                     for parent_id in parents {
-                        relations.push(format!("node_{id} -> node_{parent_id};\n"));
+                        relations.push(format!("node_{id} -> node_{parent_id};"));
                     }
 
                     for child_id in children {
-                        relations.push(format!("node_{id} -> node_{child_id};\n"));
+                        relations.push(format!("node_{id} -> node_{child_id};"));
                     }
                 }
                 ATreeNode::RNode(RNode {
@@ -362,7 +384,7 @@ impl<T: Eq + Hash + Clone> ATree<T> {
                         r#"node_{id} [label = "{{{id} | {operator:#?} | r-node}}"];"#
                     ));
                     for child_id in children {
-                        relations.push(format!("node_{id} -> node_{child_id};\n"));
+                        relations.push(format!("node_{id} -> node_{child_id};"));
                     }
                 }
             }
@@ -389,6 +411,7 @@ impl<T: Eq + Hash + Clone> ATree<T> {
         builder.push_str("\n// edges\n");
         for relation in relations {
             builder.push_str(&relation);
+            builder.push('\n');
         }
 
         builder.push('}');
@@ -497,6 +520,33 @@ fn change_rnode_to_inode<T>(node_id: NodeId, nodes: &mut Slab<Entry<T>>) {
 }
 
 #[inline]
+fn choose_access_child<T>(
+    left_id: NodeId,
+    right_id: NodeId,
+    parent_id: NodeId,
+    nodes: &mut Slab<Entry<T>>,
+    predicates: &mut Vec<NodeId>,
+) {
+    let left_entry = &nodes[left_id];
+    let right_entry = &nodes[right_id];
+    let accessor_id = if left_entry.cost < right_entry.cost {
+        left_id
+    } else {
+        right_id
+    };
+    add_parent(&mut nodes[accessor_id], parent_id);
+    add_predicate(accessor_id, nodes, predicates);
+}
+
+#[inline]
+fn add_predicate<T>(node_id: NodeId, nodes: &Slab<Entry<T>>, predicates: &mut Vec<NodeId>) {
+    let entry = &nodes[node_id];
+    if entry.is_leaf() && !predicates.contains(&node_id) {
+        predicates.push(node_id);
+    }
+}
+
+#[inline]
 fn process_predicates<'a, T>(
     predicates: &[NodeId],
     nodes: &'a Slab<Entry<T>>,
@@ -507,11 +557,17 @@ fn process_predicates<'a, T>(
 ) {
     for predicate_id in predicates {
         let node = &nodes[*predicate_id];
+        // The evaluation is delayed as much as possible; if the predicate has no
+        // subscribers and no parents, there is no point in evaluating eagerly and
+        // it should only be evaluated if there is a need for it.
+        let delay_evaluation = node.subscription_ids.is_empty() && node.parents().is_empty();
+        if delay_evaluation || results.is_evaluated(*predicate_id) {
+            continue;
+        }
+
         let result = node.evaluate(event);
         results.set_result(*predicate_id, result);
 
-        // There is no point in delaying the evaluation of those predicates
-        // since they count against the top level expressions
         if !node.subscription_ids.is_empty() {
             if let Some(true) = result {
                 for subscription_id in &node.subscription_ids {
@@ -620,9 +676,13 @@ fn lazy_evaluate<T>(
         return results.get_result(node_id);
     }
     let node = &nodes[node_id];
-    let result = node.evaluate(event);
-    results.set_result(node_id, result);
-    result
+    if node.is_leaf() {
+        let result = node.evaluate(event);
+        results.set_result(node_id, result);
+        result
+    } else {
+        evaluate_node(node_id, event, node, nodes, results)
+    }
 }
 
 #[derive(Clone, Debug)]

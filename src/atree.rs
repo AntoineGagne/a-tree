@@ -283,14 +283,7 @@ impl<T: Eq + Hash + Clone> ATree<T> {
                     &mut results,
                     &mut matches,
                 );
-
-                if !node.subscription_ids.is_empty() {
-                    if let Some(true) = result {
-                        for subscription_id in &node.subscription_ids {
-                            matches.push(subscription_id);
-                        }
-                    }
-                }
+                add_matches(result, node, &mut matches);
 
                 if node.is_root() {
                     continue;
@@ -574,14 +567,7 @@ fn process_predicates<'a, T>(
 
         let result = node.evaluate(event);
         results.set_result(*predicate_id, result);
-
-        if !node.subscription_ids.is_empty() {
-            if let Some(true) = result {
-                for subscription_id in &node.subscription_ids {
-                    matches.push(subscription_id);
-                }
-            }
-        }
+        add_matches(result, node, matches);
 
         node.parents()
             .iter()
@@ -696,7 +682,12 @@ fn lazy_evaluate<'a, T>(
     } else {
         evaluate_node(node_id, event, node, nodes, results, matches)
     };
+    add_matches(result, node, matches);
+    result
+}
 
+#[inline]
+fn add_matches<'a, T>(result: Option<bool>, node: &'a Entry<T>, matches: &mut Vec<&'a T>) {
     if !node.subscription_ids.is_empty() {
         if let Some(true) = result {
             for subscription_id in &node.subscription_ids {
@@ -704,8 +695,6 @@ fn lazy_evaluate<'a, T>(
             }
         }
     }
-
-    result
 }
 
 #[derive(Clone, Debug)]

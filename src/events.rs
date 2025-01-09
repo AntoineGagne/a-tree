@@ -4,7 +4,11 @@ use crate::{
 };
 use itertools::Itertools;
 use rust_decimal::Decimal;
-use std::{collections::HashMap, ops::Index};
+use std::{
+    collections::HashMap,
+    fmt::{Display, Formatter},
+    ops::Index,
+};
 use thiserror::Error;
 
 #[derive(Error, PartialEq, Debug)]
@@ -207,6 +211,12 @@ pub struct AttributeTable {
 
 #[derive(Clone, Copy, Eq, Ord, PartialEq, PartialOrd, Debug, Hash)]
 pub struct AttributeId(usize);
+
+impl Display for AttributeId {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(formatter, "attribute({})", self.0)
+    }
+}
 
 impl AttributeTable {
     pub fn new(definitions: &[AttributeDefinition]) -> Result<Self, EventError> {

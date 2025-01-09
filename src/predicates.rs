@@ -4,6 +4,7 @@ use crate::{
 };
 use rust_decimal::Decimal;
 use std::{
+    fmt::{Display, Formatter},
     hash::{Hash, Hasher},
     ops::Not,
 };
@@ -73,6 +74,12 @@ impl Not for Predicate {
             attribute: self.attribute,
             kind: !self.kind,
         }
+    }
+}
+
+impl Display for Predicate {
+    fn fmt(&self, formatter: &mut Formatter) -> std::fmt::Result {
+        write!(formatter, "⟨{}, {}⟩", self.attribute, self.kind)
     }
 }
 
@@ -197,6 +204,20 @@ impl Not for PredicateKind {
     }
 }
 
+impl Display for PredicateKind {
+    fn fmt(&self, formatter: &mut Formatter) -> std::fmt::Result {
+        match self {
+            Self::Variable => write!(formatter, "id, variable"),
+            Self::NegatedVariable => write!(formatter, "not, variable"),
+            Self::Set(operator, values) => write!(formatter, "{operator}, {values}"),
+            Self::Comparison(operator, values) => write!(formatter, "{operator}, {values}"),
+            Self::List(operator, values) => write!(formatter, "{operator}, {values}"),
+            Self::Null(operator) => write!(formatter, "{operator}, variable"),
+            Self::Equality(operator, values) => write!(formatter, "{operator}, {values}"),
+        }
+    }
+}
+
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]
 pub enum SetOperator {
     NotIn,
@@ -222,6 +243,15 @@ impl SetOperator {
         match self {
             Self::In => haystack.binary_search(needle).is_ok(),
             Self::NotIn => haystack.binary_search(needle).is_err(),
+        }
+    }
+}
+
+impl Display for SetOperator {
+    fn fmt(&self, formatter: &mut Formatter) -> std::fmt::Result {
+        match self {
+            Self::In => write!(formatter, "in"),
+            Self::NotIn => write!(formatter, "not in"),
         }
     }
 }
@@ -255,10 +285,30 @@ impl ComparisonOperator {
     }
 }
 
+impl Display for ComparisonOperator {
+    fn fmt(&self, formatter: &mut Formatter) -> std::fmt::Result {
+        match self {
+            Self::GreaterThanEqual => write!(formatter, ">="),
+            Self::GreaterThan => write!(formatter, ">"),
+            Self::LessThan => write!(formatter, "<"),
+            Self::LessThanEqual => write!(formatter, "<="),
+        }
+    }
+}
+
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]
 pub enum ComparisonValue {
     Integer(i64),
     Float(Decimal),
+}
+
+impl Display for ComparisonValue {
+    fn fmt(&self, formatter: &mut Formatter) -> std::fmt::Result {
+        match self {
+            Self::Integer(value) => write!(formatter, "{value}"),
+            Self::Float(value) => write!(formatter, "{value}"),
+        }
+    }
 }
 
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]
@@ -283,6 +333,15 @@ impl EqualityOperator {
         match self {
             Self::Equal => *a == *b,
             Self::NotEqual => *a != *b,
+        }
+    }
+}
+
+impl Display for EqualityOperator {
+    fn fmt(&self, formatter: &mut Formatter) -> std::fmt::Result {
+        match self {
+            Self::Equal => write!(formatter, "="),
+            Self::NotEqual => write!(formatter, "<>"),
         }
     }
 }
@@ -319,6 +378,17 @@ impl ListOperator {
             Self::NoneOf => none_of(left, right),
             Self::AllOf => all_of(left, right),
             Self::NotAllOf => not_all_of(left, right),
+        }
+    }
+}
+
+impl Display for ListOperator {
+    fn fmt(&self, formatter: &mut Formatter) -> std::fmt::Result {
+        match self {
+            Self::AllOf => write!(formatter, "all of"),
+            Self::OneOf => write!(formatter, "one of"),
+            Self::NoneOf => write!(formatter, "none of"),
+            Self::NotAllOf => write!(formatter, "not all of"),
         }
     }
 }
@@ -431,10 +501,30 @@ impl NullOperator {
     }
 }
 
+impl Display for NullOperator {
+    fn fmt(&self, formatter: &mut Formatter) -> std::fmt::Result {
+        match self {
+            Self::IsNull => write!(formatter, "is null"),
+            Self::IsNotNull => write!(formatter, "is not null"),
+            Self::IsEmpty => write!(formatter, "is empty"),
+            Self::IsNotEmpty => write!(formatter, "is not empty"),
+        }
+    }
+}
+
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]
 pub enum ListLiteral {
     IntegerList(Vec<i64>),
     StringList(Vec<StringId>),
+}
+
+impl Display for ListLiteral {
+    fn fmt(&self, formatter: &mut Formatter) -> std::fmt::Result {
+        match self {
+            Self::IntegerList(values) => write!(formatter, "{values:?}"),
+            Self::StringList(values) => write!(formatter, "{values:?}"),
+        }
+    }
 }
 
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]
@@ -442,6 +532,16 @@ pub enum PrimitiveLiteral {
     Integer(i64),
     Float(Decimal),
     String(StringId),
+}
+
+impl Display for PrimitiveLiteral {
+    fn fmt(&self, formatter: &mut Formatter) -> std::fmt::Result {
+        match self {
+            Self::Integer(values) => write!(formatter, "{values}"),
+            Self::Float(values) => write!(formatter, "{values}"),
+            Self::String(values) => write!(formatter, "{values:?}"),
+        }
+    }
 }
 
 #[cfg(test)]

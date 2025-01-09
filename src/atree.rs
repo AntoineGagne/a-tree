@@ -8,7 +8,7 @@ use crate::{
     strings::StringTable,
 };
 use slab::Slab;
-use std::{collections::HashMap, hash::Hash};
+use std::{collections::HashMap, fmt::Debug, hash::Hash};
 
 type NodeId = usize;
 type ExpressionId = u64;
@@ -30,7 +30,7 @@ pub struct ATree<T> {
     nodes_by_ids: HashMap<T, NodeId>,
 }
 
-impl<T: Eq + Hash + Clone> ATree<T> {
+impl<T: Eq + Hash + Clone + Debug> ATree<T> {
     const DEFAULT_PREDICATES: usize = 1000;
     const DEFAULT_NODES: usize = 2000;
     const DEFAULT_ROOTS: usize = 50;
@@ -343,19 +343,23 @@ impl<T: Eq + Hash + Clone> ATree<T> {
         const DEFAULT_CAPACITY: usize = 100_000;
         let mut builder = String::with_capacity(DEFAULT_CAPACITY);
         builder.push_str("digraph {\n");
-        builder.push_str(r#"concentrate = true;"#);
+        builder.push_str("rankdir = TB;\n");
         builder.push_str(r#"node [shape = "record"];"#);
         builder.push('\n');
-        let mut inodes = Vec::with_capacity(self.nodes.len());
-        let mut lnodes = Vec::with_capacity(self.nodes.len());
-        let mut rnodes = Vec::with_capacity(self.nodes.len());
         let mut relations = Vec::with_capacity(DEFAULT_CAPACITY);
+        let mut levels = vec![vec![]; self.max_level];
         for (id, entry) in &self.nodes {
             match &entry.node {
-                ATreeNode::LNode(LNode { parents, .. }) => {
-                    lnodes.push(format!(
-                        r#"node_{id} [label = "{{{id} | l-node}}", style = "rounded"];"#
-                    ));
+                ATreeNode::LNode(LNode {
+                    parents, predicate, ..
+                }) => {
+                    let node = format!(
+                        r#"node_{id} [label = "{{{id} | level: {} | {predicate} | subscriptions: {:?} | l-node}}", style = "rounded"];"#,
+                        entry.level(),
+                        entry.subscription_ids
+                    );
+                    levels[entry.level() - 1].push((id, node));
+
                     for parent_id in parents {
                         relations.push(format!("node_{id} -> node_{parent_id};"));
                     }
@@ -366,9 +370,13 @@ impl<T: Eq + Hash + Clone> ATree<T> {
                     operator,
                     ..
                 }) => {
-                    inodes.push(format!(
-                        r#"node_{id} [label = "{{{id} | {operator:#?} | i-node}}"];"#
-                    ));
+                    let node = format!(
+                        r#"node_{id} [label = "{{{id} | level: {} | {operator:#?} | subscriptions: {:?} | i-node}}"];"#,
+                        entry.level(),
+                        entry.subscription_ids
+                    );
+                    levels[entry.level() - 1].push((id, node));
+
                     for parent_id in parents {
                         relations.push(format!("node_{id} -> node_{parent_id};"));
                     }
@@ -380,9 +388,13 @@ impl<T: Eq + Hash + Clone> ATree<T> {
                 ATreeNode::RNode(RNode {
                     children, operator, ..
                 }) => {
-                    rnodes.push(format!(
-                        r#"node_{id} [label = "{{{id} | {operator:#?} | r-node}}"];"#
-                    ));
+                    let node = format!(
+                        r#"node_{id} [label = "{{{id} | level: {} | {operator:#?} | subscriptions: {:?} | r-node}}"];"#,
+                        entry.level(),
+                        entry.subscription_ids
+                    );
+                    levels[entry.level() - 1].push((id, node));
+
                     for child_id in children {
                         relations.push(format!("node_{id} -> node_{child_id};"));
                     }
@@ -390,22 +402,18 @@ impl<T: Eq + Hash + Clone> ATree<T> {
             }
         }
 
-        builder.push_str("\n// r-nodes\n");
-        for rnode in rnodes {
-            builder.push_str(&rnode);
-            builder.push('\n');
-        }
+        builder.push_str("\n// nodes\n");
+        for entries in levels.into_iter().rev() {
+            for (_, node) in entries.iter() {
+                builder.push_str(node);
+                builder.push('\n');
+            }
 
-        builder.push_str("\n// i-nodes\n");
-        for inode in inodes {
-            builder.push_str(&inode);
-            builder.push('\n');
-        }
-
-        builder.push_str("\n// l-nodes\n");
-        for lnode in lnodes {
-            builder.push_str(&lnode);
-            builder.push('\n');
+            builder.push_str("{rank = same; ");
+            for (id, _) in entries {
+                builder.push_str(&format!("node_{id}; "));
+            }
+            builder.push_str("};\n");
         }
 
         builder.push_str("\n// edges\n");

@@ -275,11 +275,14 @@ impl<T: Eq + Hash + Clone> ATree<T> {
                     continue;
                 }
 
-                let result = evaluate_node(node_id, &event, node, &self.nodes, &mut results);
-
-                if result.is_none() {
-                    continue;
-                }
+                let result = evaluate_node(
+                    node_id,
+                    &event,
+                    node,
+                    &self.nodes,
+                    &mut results,
+                    &mut matches,
+                );
 
                 if !node.subscription_ids.is_empty() {
                     if let Some(true) = result {
@@ -287,6 +290,9 @@ impl<T: Eq + Hash + Clone> ATree<T> {
                             matches.push(subscription_id);
                         }
                     }
+                }
+
+                if node.is_root() {
                     continue;
                 }
 
@@ -591,32 +597,35 @@ fn process_predicates<'a, T>(
 }
 
 #[inline]
-fn evaluate_node<T>(
+fn evaluate_node<'a, T>(
     node_id: NodeId,
     event: &Event,
-    node: &Entry<T>,
-    nodes: &Slab<Entry<T>>,
+    node: &'a Entry<T>,
+    nodes: &'a Slab<Entry<T>>,
     results: &mut EvaluationResult,
+    matches: &mut Vec<&'a T>,
 ) -> Option<bool> {
     let operator = node.operator();
     let result = match operator {
-        Operator::And => evaluate_and(node.children(), event, nodes, results),
-        Operator::Or => evaluate_or(node.children(), event, nodes, results),
+        Operator::And => evaluate_and(node.children(), event, nodes, results, matches),
+        Operator::Or => evaluate_or(node.children(), event, nodes, results, matches),
     };
     results.set_result(node_id, result);
     result
 }
 
 #[inline]
-fn evaluate_and<T>(
+fn evaluate_and<'a, T>(
     children: &[NodeId],
     event: &Event,
-    nodes: &Slab<Entry<T>>,
+    nodes: &'a Slab<Entry<T>>,
     results: &mut EvaluationResult,
+    matches: &mut Vec<&'a T>,
 ) -> Option<bool> {
     let mut acc = Some(true);
     for child_id in children {
-        match (acc, lazy_evaluate(*child_id, event, nodes, results)) {
+        let result = lazy_evaluate(*child_id, event, nodes, results, matches);
+        match (acc, result) {
             (Some(false), _) => {
                 acc = Some(false);
                 break;
@@ -637,15 +646,17 @@ fn evaluate_and<T>(
 }
 
 #[inline]
-fn evaluate_or<T>(
+fn evaluate_or<'a, T>(
     children: &[NodeId],
     event: &Event,
-    nodes: &Slab<Entry<T>>,
+    nodes: &'a Slab<Entry<T>>,
     results: &mut EvaluationResult,
+    matches: &mut Vec<&'a T>,
 ) -> Option<bool> {
     let mut acc = Some(false);
     for child_id in children {
-        match (acc, lazy_evaluate(*child_id, event, nodes, results)) {
+        let result = lazy_evaluate(*child_id, event, nodes, results, matches);
+        match (acc, result) {
             (Some(true), _) => {
                 acc = Some(true);
                 break;
@@ -667,23 +678,34 @@ fn evaluate_or<T>(
 }
 
 #[inline]
-fn lazy_evaluate<T>(
+fn lazy_evaluate<'a, T>(
     node_id: NodeId,
     event: &Event,
-    nodes: &Slab<Entry<T>>,
+    nodes: &'a Slab<Entry<T>>,
     results: &mut EvaluationResult,
+    matches: &mut Vec<&'a T>,
 ) -> Option<bool> {
     if results.is_evaluated(node_id) {
         return results.get_result(node_id);
     }
     let node = &nodes[node_id];
-    if node.is_leaf() {
+    let result = if node.is_leaf() {
         let result = node.evaluate(event);
         results.set_result(node_id, result);
         result
     } else {
-        evaluate_node(node_id, event, node, nodes, results)
+        evaluate_node(node_id, event, node, nodes, results, matches)
+    };
+
+    if !node.subscription_ids.is_empty() {
+        if let Some(true) = result {
+            for subscription_id in &node.subscription_ids {
+                matches.push(subscription_id);
+            }
+        }
     }
+
+    result
 }
 
 #[derive(Clone, Debug)]
@@ -710,6 +732,11 @@ impl<T> Entry<T> {
     #[inline]
     const fn is_leaf(&self) -> bool {
         matches!(self.node, ATreeNode::LNode(_))
+    }
+
+    #[inline]
+    const fn is_root(&self) -> bool {
+        matches!(self.node, ATreeNode::RNode(_))
     }
 
     #[inline]
@@ -797,7 +824,7 @@ impl ATreeNode {
     fn parents(&self) -> &[NodeId] {
         match self {
             Self::INode(INode { parents, .. }) | Self::LNode(LNode { parents, .. }) => parents,
-            Self::RNode(_) => unreachable!("cannot get children for r-node; this is a bug"),
+            Self::RNode(_) => unreachable!("cannot get parents for r-node; this is a bug"),
         }
     }
 
@@ -1193,6 +1220,53 @@ mod tests {
         let mut actual = atree.search(event).unwrap().matches().to_vec();
         actual.sort();
         assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn can_search_a_tree_with_multiple_shared_sub_expressions() {
+        let definitions = [
+            AttributeDefinition::boolean("private"),
+            AttributeDefinition::integer("exchange_id"),
+            AttributeDefinition::string_list("deals"),
+            AttributeDefinition::integer_list("segment_ids"),
+            AttributeDefinition::string("country"),
+            AttributeDefinition::string("city"),
+        ];
+        let mut atree = ATree::new(&definitions).unwrap();
+        [
+            (
+                1,
+                r#"exchange_id = 1 and not private and deals one of ["deal-1", "deal-2"]"#,
+            ),
+            (
+                2,
+                r#"exchange_id = 1 and not private and deals one of ["deal-2", "deal-3"]"#,
+            ),
+            (
+                3,
+                r#"exchange_id = 1 and not private and deals one of ["deal-2", "deal-3"] and segment_ids one of [1, 2, 3, 4]"#,
+            ),
+            (
+                4,
+                r#"exchange_id = 1 and not private and deals one of ["deal-2", "deal-3"] and segment_ids one of [5, 6, 7, 8] and country in ["CA", "US"]"#,
+            ),
+        ].into_iter().for_each(|(id, expression)| {
+                atree.insert(&id, expression).unwrap()
+        });
+
+        let mut builder = atree.make_event();
+        builder.with_boolean("private", false).unwrap();
+        builder.with_integer("exchange_id", 1).unwrap();
+        builder
+            .with_string_list("deals", &["deal-1", "deal-3"])
+            .unwrap();
+        builder.with_integer_list("segment_ids", &[2, 3]).unwrap();
+        builder.with_string("country", "CA").unwrap();
+        let event = builder.build().unwrap();
+
+        let mut matches = atree.search(event).unwrap().matches().to_vec();
+        matches.sort();
+        assert_eq!(vec![&1, &2, &3], matches);
     }
 
     #[test]

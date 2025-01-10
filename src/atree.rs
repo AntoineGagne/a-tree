@@ -253,7 +253,7 @@ impl<T: Eq + Hash + Clone + Debug> ATree<T> {
     }
 
     /// Search the [`ATree`] for arbitrary boolean expressions that match the [`Event`].
-    pub fn search(&self, event: Event) -> Result<Report<T>, ATreeError> {
+    pub fn search(&self, event: &Event) -> Result<Report<T>, ATreeError> {
         let mut results = EvaluationResult::new(self.nodes.len());
         let mut matches = Vec::with_capacity(50);
 
@@ -263,7 +263,7 @@ impl<T: Eq + Hash + Clone + Debug> ATree<T> {
         process_predicates(
             &self.predicates,
             &self.nodes,
-            &event,
+            event,
             &mut matches,
             &mut results,
             &mut queues,
@@ -277,7 +277,7 @@ impl<T: Eq + Hash + Clone + Debug> ATree<T> {
 
                 let result = evaluate_node(
                     node_id,
-                    &event,
+                    event,
                     node,
                     &self.nodes,
                     &mut results,
@@ -1111,7 +1111,7 @@ mod tests {
         let event = builder.build().unwrap();
 
         let expected: Vec<&u64> = vec![];
-        let actual = atree.search(event).unwrap().matches().to_vec();
+        let actual = atree.search(&event).unwrap().matches().to_vec();
         assert_eq!(expected, actual);
     }
 
@@ -1133,7 +1133,7 @@ mod tests {
         let event = builder.build().unwrap();
 
         let expected = vec![&1u64];
-        let actual = atree.search(event).unwrap().matches().to_vec();
+        let actual = atree.search(&event).unwrap().matches().to_vec();
         assert_eq!(expected, actual);
     }
 
@@ -1156,7 +1156,7 @@ mod tests {
         let event = builder.build().unwrap();
 
         let expected: Vec<&u64> = vec![];
-        let actual = atree.search(event).unwrap().matches().to_vec();
+        let actual = atree.search(&event).unwrap().matches().to_vec();
         assert_eq!(expected, actual);
     }
 
@@ -1179,7 +1179,7 @@ mod tests {
         let event = builder.build().unwrap();
 
         let expected = vec![&1u64];
-        let mut actual = atree.search(event).unwrap().matches().to_vec();
+        let mut actual = atree.search(&event).unwrap().matches().to_vec();
         actual.sort();
         assert_eq!(expected, actual);
     }
@@ -1214,7 +1214,7 @@ mod tests {
         let event = builder.build().unwrap();
 
         let expected = vec![&2, &3];
-        let mut actual = atree.search(event).unwrap().matches().to_vec();
+        let mut actual = atree.search(&event).unwrap().matches().to_vec();
         actual.sort();
         assert_eq!(expected, actual);
     }
@@ -1261,7 +1261,7 @@ mod tests {
         builder.with_string("country", "CA").unwrap();
         let event = builder.build().unwrap();
 
-        let mut matches = atree.search(event).unwrap().matches().to_vec();
+        let mut matches = atree.search(&event).unwrap().matches().to_vec();
         matches.sort();
         assert_eq!(vec![&1, &2, &3], matches);
     }
@@ -1275,14 +1275,14 @@ mod tests {
         builder.with_boolean("private", true).unwrap();
         let event = builder.build().unwrap();
 
-        let results = atree.search(event).unwrap().matches().to_vec();
+        let results = atree.search(&event).unwrap().matches().to_vec();
         assert_eq!(vec![&1u64], results);
 
         atree.delete(&1u64);
         let mut builder = atree.make_event();
         builder.with_boolean("private", true).unwrap();
         let event = builder.build().unwrap();
-        let results = atree.search(event).unwrap().matches().to_vec();
+        let results = atree.search(&event).unwrap().matches().to_vec();
         assert!(results.is_empty());
     }
 
@@ -1307,14 +1307,14 @@ mod tests {
         builder.with_integer("exchange_id", 1).unwrap();
         let event = builder.build().unwrap();
 
-        let results = atree.search(event).unwrap().matches().to_vec();
+        let results = atree.search(&event).unwrap().matches().to_vec();
         assert_eq!(vec![&1u64, &2u64], results);
 
         atree.delete(&1u64);
         let mut builder = atree.make_event();
         builder.with_integer("exchange_id", 1).unwrap();
         let event = builder.build().unwrap();
-        let results = atree.search(event).unwrap().matches().to_vec();
+        let results = atree.search(&event).unwrap().matches().to_vec();
         assert_eq!(vec![&2u64], results);
     }
 
@@ -1333,14 +1333,14 @@ mod tests {
         builder.with_integer("exchange_id", 1).unwrap();
         let event = builder.build().unwrap();
 
-        let results = atree.search(event).unwrap().matches().to_vec();
+        let results = atree.search(&event).unwrap().matches().to_vec();
         assert_eq!(vec![&1u64, &2u64], results);
 
         atree.delete(&1u64);
         let mut builder = atree.make_event();
         builder.with_integer("exchange_id", 1).unwrap();
         let event = builder.build().unwrap();
-        let results = atree.search(event).unwrap().matches().to_vec();
+        let results = atree.search(&event).unwrap().matches().to_vec();
         assert_eq!(vec![&2u64], results);
     }
 
@@ -1358,7 +1358,7 @@ mod tests {
         builder.with_integer("exchange_id", 1).unwrap();
         let event = builder.build().unwrap();
 
-        let results = atree.search(event).unwrap().matches().to_vec();
+        let results = atree.search(&event).unwrap().matches().to_vec();
         assert_eq!(vec![&1u64, &2u64], results);
 
         atree.delete(&1u64);
@@ -1366,7 +1366,7 @@ mod tests {
         let mut builder = atree.make_event();
         builder.with_integer("exchange_id", 1).unwrap();
         let event = builder.build().unwrap();
-        let results = atree.search(event).unwrap().matches().to_vec();
+        let results = atree.search(&event).unwrap().matches().to_vec();
         assert!(results.is_empty());
     }
 

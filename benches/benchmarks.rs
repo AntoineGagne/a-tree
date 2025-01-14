@@ -44,26 +44,21 @@ pub fn search(c: &mut Criterion) {
     ];
     let mut atree = ATree::new(&attributes).unwrap();
     atree.insert(AN_ID, AN_EXPRESSION).unwrap();
+    let mut builder = atree.make_event();
+    builder.with_integer("exchange_id", 5).unwrap();
+    builder
+        .with_string_list("deal_ids", &["deal-3", "deal-1"])
+        .unwrap();
+    builder
+        .with_integer_list("segment_ids", &[3, 4, 5])
+        .unwrap();
+    builder.with_string("country", "US").unwrap();
+    builder.with_string("city", "AZ").unwrap();
+    let event = builder.build().unwrap();
     c.bench_function("search", |b| {
-        b.iter_batched(
-            || {
-                let mut builder = atree.make_event();
-                builder.with_integer("exchange_id", 5).unwrap();
-                builder
-                    .with_string_list("deal_ids", &["deal-3", "deal-1"])
-                    .unwrap();
-                builder
-                    .with_integer_list("segment_ids", &[3, 4, 5])
-                    .unwrap();
-                builder.with_string("country", "US").unwrap();
-                builder.with_string("city", "AZ").unwrap();
-                builder.build().unwrap()
-            },
-            |event| {
-                let _ = std::hint::black_box(atree.search(event));
-            },
-            BatchSize::SmallInput,
-        )
+        b.iter(|| {
+            let _ = std::hint::black_box(atree.search(&event));
+        })
     });
 }
 
@@ -119,47 +114,42 @@ pub fn search_with_files(c: &mut Criterion) {
         .iter()
         .for_each(|Expression { id, expression }| atree.insert(id, expression).unwrap());
 
-    c.bench_function("search_with_files", |b| {
-        b.iter_batched(
-            || {
-                content
-                    .events
-                    .iter()
-                    .map(|event| {
-                        let mut builder = atree.make_event();
-                        event.iter().for_each(|(name, value)| match value {
-                            EventValue::String(value) => {
-                                builder.with_string(name, value).unwrap();
-                            }
-                            EventValue::Boolean(value) => {
-                                builder.with_boolean(name, *value).unwrap();
-                            }
-                            EventValue::Integer(value) => {
-                                builder.with_integer(name, *value).unwrap();
-                            }
-                            EventValue::StringList(value) => {
-                                builder
-                                    .with_string_list(
-                                        name,
-                                        value.iter().map(|x| x.as_str()).collect_vec().as_slice(),
-                                    )
-                                    .unwrap();
-                            }
-                            EventValue::IntegerList(value) => {
-                                builder.with_integer_list(name, value).unwrap();
-                            }
-                        });
-                        builder.build().unwrap()
-                    })
-                    .collect_vec()
-            },
-            |events| {
-                for event in events {
-                    let _ = std::hint::black_box(atree.search(event));
+    let events = content
+        .events
+        .iter()
+        .map(|event| {
+            let mut builder = atree.make_event();
+            event.iter().for_each(|(name, value)| match value {
+                EventValue::String(value) => {
+                    builder.with_string(name, value).unwrap();
                 }
-            },
-            BatchSize::SmallInput,
-        )
+                EventValue::Boolean(value) => {
+                    builder.with_boolean(name, *value).unwrap();
+                }
+                EventValue::Integer(value) => {
+                    builder.with_integer(name, *value).unwrap();
+                }
+                EventValue::StringList(value) => {
+                    builder
+                        .with_string_list(
+                            name,
+                            value.iter().map(|x| x.as_str()).collect_vec().as_slice(),
+                        )
+                        .unwrap();
+                }
+                EventValue::IntegerList(value) => {
+                    builder.with_integer_list(name, value).unwrap();
+                }
+            });
+            builder.build().unwrap()
+        })
+        .collect_vec();
+    c.bench_function("search_with_files", |b| {
+        b.iter(|| {
+            for event in &events {
+                let _ = std::hint::black_box(atree.search(event));
+            }
+        })
     });
 }
 

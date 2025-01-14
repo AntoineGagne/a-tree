@@ -37,7 +37,7 @@
 //! let event = builder.build().unwrap();
 //!
 //! // Search for matching boolean expressions
-//! let report = atree.search(event).unwrap();
+//! let report = atree.search(&event).unwrap();
 //! report.matches().iter().for_each(|id| {
 //!     println!(r#"Found ID: {id}, Expression: "{}""#, mappings[id]);
 //! });

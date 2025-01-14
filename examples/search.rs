@@ -41,7 +41,7 @@ fn main() {
     let event = builder.build().unwrap();
 
     // Search inside the A-Tree for matching events
-    let report = atree.search(event).unwrap();
+    let report = atree.search(&event).unwrap();
     report.matches().iter().for_each(|id| {
         println!(r#"Found ID: {id}, Expression: "{}""#, mappings[id]);
     });

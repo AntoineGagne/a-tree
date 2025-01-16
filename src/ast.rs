@@ -47,7 +47,11 @@ impl OptimizedNode {
     #[inline]
     pub fn cost(&self) -> u64 {
         match self {
-            Self::And(left, right) | Self::Or(left, right) => left.cost() + right.cost() + 1,
+            // There is more chance that the evaluation leads to a `false` result which means that
+            // `AND` nodes are usually less expansive since they might be skipped entirely because
+            // of the propagation on demand.
+            Self::And(left, right) => left.cost() + right.cost() + 50,
+            Self::Or(left, right) => left.cost() + right.cost() + 60,
             Self::Value(node) => node.cost(),
         }
     }

@@ -1,7 +1,9 @@
 [package]
 name = "a-tree"
+homepage = "https://github.com/AntoineGagne/a-tree"
 repository = "https://github.com/AntoineGagne/a-tree"
 description = "A dynamic data structure for efficiently indexing arbitrary boolean expressions"
+documentation = "https://docs.rs/crate/a-tree/latest"
 authors = ["Antoine Gagné <gagnantoine@gmail.com>"]
 readme = "README.md"
 license = "MIT OR Apache-2.0"

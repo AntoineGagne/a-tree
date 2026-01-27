@@ -1,17 +1,38 @@
+// name=build.rs
+use std::env;
+use std::fs;
+use std::path::Path;
+
 fn main() {
-    // 1) Generate parser code with lalrpop (existing behavior)
+    // 1) Remove any stale cxxbridge-generated crate that might cause lalrpop recursion.
+    //    We look under <manifest_dir>/target/*/out/cxxbridge/crate/a-tree and delete it if present.
+    let manifest_dir = env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR not set");
+    let target_dir = Path::new(&manifest_dir).join("target");
+    if target_dir.exists() {
+        if let Ok(entries) = fs::read_dir(&target_dir) {
+            for entry in entries.filter_map(Result::ok) {
+                let out_cxx = entry.path()
+                    .join("out")
+                    .join("cxxbridge")
+                    .join("crate")
+                    .join("a-tree");
+                if out_cxx.exists() {
+                    // ignore errors when removing; we don't want build.rs to panic on transient failures
+                    let _ = fs::remove_dir_all(&out_cxx);
+                }
+            }
+        }
+    }
+
+    // 2) Run lalrpop first so generated parser sources are present for the Rust compiler.
     lalrpop::process_root().expect("lalrpop failed to process grammar files");
 
-    // 2) Build the cxx bridge (generates C++ glue and compiles it into the Rust crate).
-    //    This requires adding cxx-build to [build-dependencies] in Cargo.toml.
+    // 3) Then run cxx_build to generate and compile the cxx bridge sources.
     cxx_build::bridge("src/ffi.rs")
-        // Optionally add extra .cpp files if you add C++ helpers:
-        // .file("src/cpp_helpers.cpp")
+        // .file("src/some_cpp_helper.cpp") // add any extra cpp files if you add them
         .compile("a-tree-cxxbridge");
 
-    // 3) Re-run directives: re-run build if these sources change.
+    // 4) Provide rerun-if-changed hints.
     println!("cargo:rerun-if-changed=src/grammar.lalrpop");
     println!("cargo:rerun-if-changed=src/ffi.rs");
-    // If you add other files that affect the build (lexer, headers), add them too:
-    // println!("cargo:rerun-if-changed=src/lexer.rs");
 }

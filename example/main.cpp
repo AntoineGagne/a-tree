@@ -1,56 +1,52 @@
 #include <iostream>
-#include <memory>
-#include <vector>
 #include <string>
 
-// Include the generated header from cxx. The exact include path depends on your build setup.
-// cxx generates a header for the bridge; adjust include path as appropriate for your build.
-#include "ffi.rs.h" // the generated header for the bridge module (may be in "cxxbridge/..." depending on build)
+// Include the cxx-generated header. Ensure -I points to the directory containing ffi.rs.h.
+#include "ffi.rs.h"
 
 using namespace a_tree_ffi;
+using ::rust::Vec;
+using ::rust::String;
+using ::rust::Box;
 
 int main() {
-    // Build attribute definitions
-    std::vector<AttributeDefinition> defs;
-    defs.push_back(AttributeDefinition{"private", AttributeKind::Boolean});
-    defs.push_back(AttributeDefinition{"exchange_id", AttributeKind::Integer});
-    defs.push_back(AttributeDefinition{"deal_ids", AttributeKind::StringList});
-    // Create tree
-    auto maybe_tree = atree_new(defs);
-    if (!maybe_tree.has_value()) {
-        std::cerr << "Failed to create tree: " << maybe_tree.error() << std::endl;
-        return 1;
-    }
-    std::unique_ptr<ATreeU64> tree = std::move(maybe_tree.value());
+    // Build attribute definitions using rust::Vec and rust::String
+    Vec<AttributeDefinition> defs;
+    defs.push_back(AttributeDefinition{ String("private"), AttributeKind::Boolean });
+    defs.push_back(AttributeDefinition{ String("exchange_id"), AttributeKind::Integer });
+    defs.push_back(AttributeDefinition{ String("deal_ids"), AttributeKind::StringList });
 
-    // Insert a subscription
-    auto res = atree_insert(*tree, 42ull, "exchange_id = 1 and private");
-    if (!res.has_value()) {
-        std::cerr << "Insert error: " << res.error() << std::endl;
-        return 1;
-    }
+    // Create the tree (returns rust::Box<ATreeU64>)
+    Box<ATreeU64> tree = atree_new(std::move(defs));
 
-    // Build an Event
-    EventValue v;
-    v.tag = EventValueTag::Boolean;
-    v.boolean = false;
+    // Insert a subscription (atree_insert returns void)
+    atree_insert(*tree, 42ull, "exchange_id = 1 and private");
 
-    EventAttribute a;
-    a.name = "private";
-    a.value = v;
+    // Build an Event with one boolean attribute
+    Vec<EventAttribute> attributes;
+    EventValue val;
+    val.tag = EventValueTag::Boolean;
+    val.boolean = false;
+
+    EventAttribute attr;
+    attr.name = String("private");
+    attr.value = std::move(val);
+
+    attributes.push_back(std::move(attr));
 
     Event ev;
-    ev.attributes.push_back(a);
+    ev.attributes = std::move(attributes);
 
-    // Search
-    auto maybe_matches = atree_search(*tree, ev);
-    if (!maybe_matches.has_value()) {
-        std::cerr << "Search error: " << maybe_matches.error() << std::endl;
-        return 1;
-    }
-    std::vector<uint64_t> matches = maybe_matches.value();
+    // Search (returns rust::Vec<uint64_t>)
+    Vec<uint64_t> matches = atree_search(*tree, std::move(ev));
+
     std::cout << "Matches:";
-    for (auto id : matches) std::cout << " " << id;
+    for (auto id : matches) {
+        std::cout << " " << id;
+    }
     std::cout << std::endl;
+
+    // tree (rust::Box) will be dropped automatically when it goes out of scope,
+    // which calls back into Rust to free the object.
     return 0;
 }

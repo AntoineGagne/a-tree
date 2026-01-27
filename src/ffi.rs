@@ -134,3 +134,6 @@ impl ATreeU64 {
     }
 }
 
+pub fn atree_free(_: Box<ATreeU64>) {
+    // Box is dropped here when this function returns, freeing the Rust-side object.
+}

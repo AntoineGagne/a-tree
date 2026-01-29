@@ -1,0 +1,10 @@
+# Build artifacts
+/target/
+example_c
+example_cpp
+
+# Generated header is committed but can be regenerated
+# atree.h
+
+# Cargo lock file (optional for libraries)
+Cargo.lock

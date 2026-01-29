@@ -22,6 +22,17 @@ This crate supports the following features:
 
 The documentation is available on [doc.rs](https://docs.rs/crate/a-tree/latest).
 
+## C/C++ Bindings
+
+C and C++ bindings are available in the [`a-tree-ffi`](a-tree-ffi/) subdirectory. The FFI provides:
+
+* Clean C API with explicit memory management
+* Auto-generated C header file
+* RAII C++ wrapper examples
+* Both static and dynamic linking support
+
+See the [a-tree-ffi README](a-tree-ffi/README.md) for usage examples and build instructions.
+
 ## License
 
 This project is licensed under the [Apache 2.0](LICENSE-APACHE) and the [MIT License](LICENSE-MIT).

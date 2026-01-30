@@ -120,7 +120,7 @@ impl<'input> Iterator for Lexer<'input> {
 mod tests {
     use super::*;
 
-    fn lex_tokens(input: &str) -> Result<Vec<Token>, ParserError> {
+    fn lex_tokens(input: &'_ str) -> Result<Vec<Token<'_>>, ParserError> {
         Lexer::new(input)
             .map(|value| match value {
                 Ok((_, token, _)) => Ok(token),

@@ -1,5 +1,6 @@
 use crate::predicates::Predicate;
-use std::hash::Hash;
+use std::cmp::{max, min};
+use std::hash::{DefaultHasher, Hash, Hasher};
 
 pub type TreeNode = Box<Node>;
 
@@ -27,19 +28,27 @@ pub enum Operator {
 impl OptimizedNode {
     #[inline]
     pub fn id(&self) -> u64 {
-        // TODO: Even though the paper specifies that way of computing the ID, I feel as though
-        // this might yield collisions. For example, if there are some expressions such as
-        // (where A = 3, B = 5, C = 2 and D = 6):
-        //
-        // A ∧ B
-        // (C ∧ D) ∨ A
-        //
-        // Then, given the above expressions, there could be a conflict in the expression IDs.
-        // If this is possible, should this implementation be switched for a commutative hashing
-        // strategy?
         match self {
-            Self::And(left, right) => u64::wrapping_mul(left.id(), right.id()),
-            Self::Or(left, right) => u64::wrapping_add(left.id(), right.id()),
+            Self::And(left, right) => {
+                let mut hasher = DefaultHasher::new();
+                Operator::And.hash(&mut hasher);
+
+                let left_id = left.id();
+                let right_id = right.id();
+                min(left_id, right_id).hash(&mut hasher);
+                max(left_id, right_id).hash(&mut hasher);
+                hasher.finish()
+            }
+            Self::Or(left, right) => {
+                let mut hasher = DefaultHasher::new();
+                Operator::Or.hash(&mut hasher);
+
+                let left_id = left.id();
+                let right_id = right.id();
+                min(left_id, right_id).hash(&mut hasher);
+                max(left_id, right_id).hash(&mut hasher);
+                hasher.finish()
+            }
             Self::Value(node) => node.id(),
         }
     }
@@ -281,6 +290,60 @@ mod tests {
         );
     }
 
+    #[test]
+    fn return_different_ids_expressions_that_only_differ_by_their_operators() {
+        let attributes = define_attributes();
+        let a_predicate = Predicate::new(&attributes, "private", PredicateKind::Variable).unwrap();
+        let another_predicate =
+            Predicate::new(&attributes, "test", PredicateKind::Variable).unwrap();
+        let expression = optimized_node::or!(
+            optimized_node::value!(a_predicate.clone()),
+            optimized_node::value!(another_predicate.clone())
+        );
+        let another_expression = optimized_node::and!(
+            optimized_node::value!(a_predicate),
+            optimized_node::value!(another_predicate)
+        );
+
+        assert_ne!(expression.id(), another_expression.id());
+    }
+
+    #[test]
+    fn return_the_same_id_on_the_same_expressions() {
+        let attributes = define_attributes();
+        let a_predicate = Predicate::new(&attributes, "private", PredicateKind::Variable).unwrap();
+        let another_predicate =
+            Predicate::new(&attributes, "test", PredicateKind::Variable).unwrap();
+        let expression = optimized_node::or!(
+            optimized_node::value!(a_predicate.clone()),
+            optimized_node::value!(another_predicate.clone())
+        );
+        let another_expression = optimized_node::or!(
+            optimized_node::value!(a_predicate),
+            optimized_node::value!(another_predicate)
+        );
+
+        assert_eq!(expression.id(), another_expression.id());
+    }
+
+    #[test]
+    fn return_the_same_id_on_expressions_that_only_differ_by_their_predicate_ordering() {
+        let attributes = define_attributes();
+        let a_predicate = Predicate::new(&attributes, "private", PredicateKind::Variable).unwrap();
+        let another_predicate =
+            Predicate::new(&attributes, "test", PredicateKind::Variable).unwrap();
+        let expression = optimized_node::or!(
+            optimized_node::value!(a_predicate.clone()),
+            optimized_node::value!(another_predicate.clone())
+        );
+        let another_expression = optimized_node::or!(
+            optimized_node::value!(another_predicate),
+            optimized_node::value!(a_predicate)
+        );
+
+        assert_eq!(expression.id(), another_expression.id());
+    }
+
     fn define_attributes() -> AttributeTable {
         let definitions = vec![
             AttributeDefinition::string_list("deals"),
@@ -288,6 +351,7 @@ mod tests {
             AttributeDefinition::integer("price"),
             AttributeDefinition::integer("exchange_id"),
             AttributeDefinition::boolean("private"),
+            AttributeDefinition::boolean("test"),
             AttributeDefinition::string_list("deal_ids"),
             AttributeDefinition::integer_list("ids"),
             AttributeDefinition::integer_list("segment_ids"),

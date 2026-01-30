@@ -157,6 +157,7 @@ impl<'atree> EventBuilder<'atree> {
         })
     }
 
+    #[inline]
     fn add_value<F>(&mut self, name: &str, actual: AttributeKind, f: F) -> Result<(), EventError>
     where
         F: FnOnce() -> AttributeValue,

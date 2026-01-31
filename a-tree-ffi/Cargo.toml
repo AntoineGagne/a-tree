@@ -1,0 +1,16 @@
+[package]
+name = "a-tree-ffi"
+version = "0.1.0"
+edition = "2021"
+authors = ["Antoine Gagné <gagnantoine@gmail.com>"]
+license = "MIT OR Apache-2.0"
+description = "C/C++ FFI bindings for the a-tree library"
+
+[lib]
+crate-type = ["cdylib", "staticlib"]
+
+[dependencies]
+a-tree = { path = "..", version = "0.5.0" }
+
+[build-dependencies]
+cbindgen = "0.27"

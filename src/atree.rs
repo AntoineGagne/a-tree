@@ -63,7 +63,7 @@ impl<T: Eq + Hash + Clone + Debug> ATree<T> {
     /// let result = ATree::<u64>::new(&definitions);
     /// assert!(result.is_err());
     /// ```
-    pub fn new(definitions: &[AttributeDefinition]) -> Result<Self, ATreeError> {
+    pub fn new(definitions: &[AttributeDefinition]) -> Result<Self, ATreeError<'_>> {
         let attributes = AttributeTable::new(definitions).map_err(ATreeError::Event)?;
         let strings = StringTable::new();
         Ok(Self {
@@ -248,12 +248,12 @@ impl<T: Eq + Hash + Clone + Debug> ATree<T> {
     /// finding the matching arbitrary boolean expressions inside the [`ATree`] via the
     /// [`ATree::search()`] function.
     #[inline]
-    pub fn make_event(&self) -> EventBuilder {
+    pub fn make_event(&self) -> EventBuilder<'_> {
         EventBuilder::new(&self.attributes, &self.strings)
     }
 
     /// Search the [`ATree`] for arbitrary boolean expressions that match the [`Event`].
-    pub fn search(&self, event: &Event) -> Result<Report<T>, ATreeError> {
+    pub fn search(&self, event: &Event) -> Result<Report<'_, T>, ATreeError<'_>> {
         let mut results = EvaluationResult::new(self.nodes.len());
         let mut matches = Vec::with_capacity(50);
 

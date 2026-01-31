@@ -94,6 +94,38 @@ struct AtreeResult atree_insert(struct ATreeHandle *handle,
                                 const char *expression);
 
 /**
+ * Delete a subscription by ID.
+ *
+ * # Arguments
+ * * `handle` - Valid ATree handle
+ * * `subscription_id` - ID of the subscription to delete
+ *
+ * # Safety
+ * - `handle` must be a valid pointer returned by `atree_new()`
+ */
+void atree_delete(struct ATreeHandle *handle, uint64_t subscription_id);
+
+/**
+ * Export the tree structure as a Graphviz DOT format string.
+ *
+ * # Returns
+ * Null-terminated string containing DOT format, or null on failure
+ *
+ * # Safety
+ * - `handle` must be a valid pointer returned by `atree_new()`
+ * - Caller must free the returned string with `atree_free_string()`
+ */
+char *atree_to_graphviz(const struct ATreeHandle *handle);
+
+/**
+ * Free a string returned by the library.
+ *
+ * # Safety
+ * - `string` must be a valid pointer from a function that returns *mut c_char
+ */
+void atree_free_string(char *string);
+
+/**
  * Start building an event for searching.
  *
  * # Safety
@@ -130,6 +162,56 @@ struct AtreeResult atree_event_builder_with_integer(void *builder, const char *n
 struct AtreeResult atree_event_builder_with_string(void *builder,
                                                    const char *name,
                                                    const char *value);
+
+/**
+ * Add a float attribute to the event.
+ *
+ * The float is represented as a decimal with a mantissa and scale.
+ * For example, 123.45 would be represented as number=12345, scale=2.
+ *
+ * # Safety
+ * - `builder` must be a valid pointer returned by `atree_event_builder_new()`
+ * - `name` must be a valid null-terminated C string
+ */
+struct AtreeResult atree_event_builder_with_float(void *builder,
+                                                  const char *name,
+                                                  int64_t number,
+                                                  uint32_t scale);
+
+/**
+ * Add a string list attribute to the event.
+ *
+ * # Safety
+ * - `builder` must be a valid pointer returned by `atree_event_builder_new()`
+ * - `name` must be a valid null-terminated C string
+ * - `values` must point to an array of `count` valid null-terminated C strings
+ */
+struct AtreeResult atree_event_builder_with_string_list(void *builder,
+                                                        const char *name,
+                                                        const char *const *values,
+                                                        uintptr_t count);
+
+/**
+ * Add an integer list attribute to the event.
+ *
+ * # Safety
+ * - `builder` must be a valid pointer returned by `atree_event_builder_new()`
+ * - `name` must be a valid null-terminated C string
+ * - `values` must point to an array of `count` i64 values
+ */
+struct AtreeResult atree_event_builder_with_integer_list(void *builder,
+                                                         const char *name,
+                                                         const int64_t *values,
+                                                         uintptr_t count);
+
+/**
+ * Add an undefined attribute to the event.
+ *
+ * # Safety
+ * - `builder` must be a valid pointer returned by `atree_event_builder_new()`
+ * - `name` must be a valid null-terminated C string
+ */
+struct AtreeResult atree_event_builder_with_undefined(void *builder, const char *name);
 
 /**
  * Search the A-Tree for matching expressions.

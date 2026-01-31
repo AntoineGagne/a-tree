@@ -162,6 +162,61 @@ pub unsafe extern "C" fn atree_insert(
     }
 }
 
+/// Delete a subscription by ID.
+///
+/// # Arguments
+/// * `handle` - Valid ATree handle
+/// * `subscription_id` - ID of the subscription to delete
+///
+/// # Safety
+/// - `handle` must be a valid pointer returned by `atree_new()`
+#[no_mangle]
+pub unsafe extern "C" fn atree_delete(
+    handle: *mut ATreeHandle,
+    subscription_id: u64,
+) {
+    if handle.is_null() {
+        return;
+    }
+
+    let handle_ref = &mut *handle;
+    handle_ref.tree.delete(&subscription_id);
+}
+
+/// Export the tree structure as a Graphviz DOT format string.
+///
+/// # Returns
+/// Null-terminated string containing DOT format, or null on failure
+///
+/// # Safety
+/// - `handle` must be a valid pointer returned by `atree_new()`
+/// - Caller must free the returned string with `atree_free_string()`
+#[no_mangle]
+pub unsafe extern "C" fn atree_to_graphviz(handle: *const ATreeHandle) -> *mut c_char {
+    if handle.is_null() {
+        return ptr::null_mut();
+    }
+
+    let handle_ref = &*handle;
+    let dot = handle_ref.tree.to_graphviz();
+
+    match CString::new(dot) {
+        Ok(c_str) => c_str.into_raw(),
+        Err(_) => ptr::null_mut(),
+    }
+}
+
+/// Free a string returned by the library.
+///
+/// # Safety
+/// - `string` must be a valid pointer from a function that returns *mut c_char
+#[no_mangle]
+pub unsafe extern "C" fn atree_free_string(string: *mut c_char) {
+    if !string.is_null() {
+        drop(CString::from_raw(string));
+    }
+}
+
 /// Start building an event for searching.
 ///
 /// # Safety
@@ -259,6 +314,137 @@ pub unsafe extern "C" fn atree_event_builder_with_string(
 
     let builder_ref = &mut *(builder as *mut a_tree::EventBuilder);
     match builder_ref.with_string(name_str, value_str) {
+        Ok(_) => AtreeResult::ok(),
+        Err(e) => AtreeResult::err(&format!("{:?}", e)),
+    }
+}
+
+/// Add a float attribute to the event.
+///
+/// The float is represented as a decimal with a mantissa and scale.
+/// For example, 123.45 would be represented as number=12345, scale=2.
+///
+/// # Safety
+/// - `builder` must be a valid pointer returned by `atree_event_builder_new()`
+/// - `name` must be a valid null-terminated C string
+#[no_mangle]
+pub unsafe extern "C" fn atree_event_builder_with_float(
+    builder: *mut c_void,
+    name: *const c_char,
+    number: i64,
+    scale: u32,
+) -> AtreeResult {
+    if builder.is_null() || name.is_null() {
+        return AtreeResult::err("Invalid arguments");
+    }
+
+    let name_str = match CStr::from_ptr(name).to_str() {
+        Ok(s) => s,
+        Err(_) => return AtreeResult::err("Invalid UTF-8 in name"),
+    };
+
+    let builder_ref = &mut *(builder as *mut a_tree::EventBuilder);
+    match builder_ref.with_float(name_str, number, scale) {
+        Ok(_) => AtreeResult::ok(),
+        Err(e) => AtreeResult::err(&format!("{:?}", e)),
+    }
+}
+
+/// Add a string list attribute to the event.
+///
+/// # Safety
+/// - `builder` must be a valid pointer returned by `atree_event_builder_new()`
+/// - `name` must be a valid null-terminated C string
+/// - `values` must point to an array of `count` valid null-terminated C strings
+#[no_mangle]
+pub unsafe extern "C" fn atree_event_builder_with_string_list(
+    builder: *mut c_void,
+    name: *const c_char,
+    values: *const *const c_char,
+    count: usize,
+) -> AtreeResult {
+    if builder.is_null() || name.is_null() || values.is_null() {
+        return AtreeResult::err("Invalid arguments");
+    }
+
+    let name_str = match CStr::from_ptr(name).to_str() {
+        Ok(s) => s,
+        Err(_) => return AtreeResult::err("Invalid UTF-8 in name"),
+    };
+
+    let values_slice = slice::from_raw_parts(values, count);
+    let mut string_vec = Vec::with_capacity(count);
+
+    for &value_ptr in values_slice {
+        if value_ptr.is_null() {
+            return AtreeResult::err("Null pointer in string list");
+        }
+        let value_str = match CStr::from_ptr(value_ptr).to_str() {
+            Ok(s) => s,
+            Err(_) => return AtreeResult::err("Invalid UTF-8 in string list"),
+        };
+        string_vec.push(value_str);
+    }
+
+    let builder_ref = &mut *(builder as *mut a_tree::EventBuilder);
+    match builder_ref.with_string_list(name_str, &string_vec) {
+        Ok(_) => AtreeResult::ok(),
+        Err(e) => AtreeResult::err(&format!("{:?}", e)),
+    }
+}
+
+/// Add an integer list attribute to the event.
+///
+/// # Safety
+/// - `builder` must be a valid pointer returned by `atree_event_builder_new()`
+/// - `name` must be a valid null-terminated C string
+/// - `values` must point to an array of `count` i64 values
+#[no_mangle]
+pub unsafe extern "C" fn atree_event_builder_with_integer_list(
+    builder: *mut c_void,
+    name: *const c_char,
+    values: *const i64,
+    count: usize,
+) -> AtreeResult {
+    if builder.is_null() || name.is_null() || values.is_null() {
+        return AtreeResult::err("Invalid arguments");
+    }
+
+    let name_str = match CStr::from_ptr(name).to_str() {
+        Ok(s) => s,
+        Err(_) => return AtreeResult::err("Invalid UTF-8 in name"),
+    };
+
+    let values_slice = slice::from_raw_parts(values, count);
+
+    let builder_ref = &mut *(builder as *mut a_tree::EventBuilder);
+    match builder_ref.with_integer_list(name_str, values_slice) {
+        Ok(_) => AtreeResult::ok(),
+        Err(e) => AtreeResult::err(&format!("{:?}", e)),
+    }
+}
+
+/// Add an undefined attribute to the event.
+///
+/// # Safety
+/// - `builder` must be a valid pointer returned by `atree_event_builder_new()`
+/// - `name` must be a valid null-terminated C string
+#[no_mangle]
+pub unsafe extern "C" fn atree_event_builder_with_undefined(
+    builder: *mut c_void,
+    name: *const c_char,
+) -> AtreeResult {
+    if builder.is_null() || name.is_null() {
+        return AtreeResult::err("Invalid arguments");
+    }
+
+    let name_str = match CStr::from_ptr(name).to_str() {
+        Ok(s) => s,
+        Err(_) => return AtreeResult::err("Invalid UTF-8 in name"),
+    };
+
+    let builder_ref = &mut *(builder as *mut a_tree::EventBuilder);
+    match builder_ref.with_undefined(name_str) {
         Ok(_) => AtreeResult::ok(),
         Err(e) => AtreeResult::err(&format!("{:?}", e)),
     }

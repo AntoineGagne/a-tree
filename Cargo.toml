@@ -34,7 +34,7 @@ name = "benchmarks"
 harness = false
 
 [build-dependencies]
-lalrpop = "0.22.0"
+lalrpop = "0.23.0"
 
 [dependencies]
 itertools = "0.14"

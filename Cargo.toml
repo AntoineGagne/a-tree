@@ -38,7 +38,7 @@ lalrpop = "0.22.0"
 
 [dependencies]
 itertools = "0.14"
-lalrpop-util = { version = "0.22.0", features = ["lexer", "unicode"] }
+lalrpop-util = { version = "0.23.0", features = ["lexer", "unicode"] }
 logos = "0.16"
 rust_decimal = "1.36"
 slab = "0.4"

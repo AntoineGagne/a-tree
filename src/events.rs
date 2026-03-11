@@ -39,7 +39,7 @@ pub enum EventError {
 /// are not assigned, they will be left `undefined`.
 #[derive(Debug)]
 pub struct EventBuilder<'atree> {
-    by_ids: Vec<AttributeValue>,
+    by_ids: Box<[AttributeValue]>,
     attributes: &'atree AttributeTable,
     strings: &'atree StringTable,
 }
@@ -49,7 +49,7 @@ impl<'atree> EventBuilder<'atree> {
         Self {
             attributes,
             strings,
-            by_ids: vec![AttributeValue::Undefined; attributes.len()],
+            by_ids: vec![AttributeValue::Undefined; attributes.len()].into_boxed_slice(),
         }
     }
 
@@ -182,7 +182,7 @@ impl<'atree> EventBuilder<'atree> {
 /// An event that can be used by the [`crate::atree::ATree`] structure to match arbitrary boolean
 /// expressions
 #[derive(Clone, Debug)]
-pub struct Event(Vec<AttributeValue>);
+pub struct Event(Box<[AttributeValue]>);
 
 impl Index<AttributeId> for Event {
     type Output = AttributeValue;

@@ -1,8 +1,8 @@
 #[derive(Debug)]
 pub struct EvaluationResult {
-    failed: Vec<u64>,
-    success: Vec<u64>,
-    evaluated: Vec<u64>,
+    failed: Box<[u64]>,
+    success: Box<[u64]>,
+    evaluated: Box<[u64]>,
 }
 
 impl EvaluationResult {
@@ -11,9 +11,9 @@ impl EvaluationResult {
     pub fn new(expressions: usize) -> Self {
         let size = expressions / Self::EXPRESSIONS_PER_BUCKET + 1;
         Self {
-            failed: vec![0; size],
-            success: vec![0; size],
-            evaluated: vec![0; size],
+            failed: vec![0; size].into_boxed_slice(),
+            success: vec![0; size].into_boxed_slice(),
+            evaluated: vec![0; size].into_boxed_slice(),
         }
     }
 

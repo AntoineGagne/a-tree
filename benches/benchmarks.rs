@@ -1,4 +1,5 @@
 use a_tree::{ATree, AttributeDefinition};
+use bumpalo::Bump;
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use itertools::Itertools;
 use serde::Deserialize;
@@ -55,9 +56,10 @@ pub fn search(c: &mut Criterion) {
     builder.with_string("country", "US").unwrap();
     builder.with_string("city", "AZ").unwrap();
     let event = builder.build().unwrap();
+    let arena = Bump::new();
     c.bench_function("search", |b| {
         b.iter(|| {
-            let _ = std::hint::black_box(atree.search(&event));
+            let _ = std::hint::black_box(atree.search_in(&event, &arena));
         })
     });
 }
@@ -144,10 +146,11 @@ pub fn search_with_files(c: &mut Criterion) {
             builder.build().unwrap()
         })
         .collect_vec();
+    let arena = Bump::new();
     c.bench_function("search_with_files", |b| {
         b.iter(|| {
             for event in &events {
-                let _ = std::hint::black_box(atree.search(event));
+                let _ = std::hint::black_box(atree.search_in(event, &arena));
             }
         })
     });

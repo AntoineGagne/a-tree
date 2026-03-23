@@ -8,6 +8,7 @@ use crate::{
     strings::StringTable,
 };
 use slab::Slab;
+use std::alloc::{Allocator, Global};
 use std::{collections::HashMap, fmt::Debug, hash::Hash};
 
 type NodeId = usize;
@@ -253,13 +254,23 @@ impl<T: Eq + Hash + Clone + Debug> ATree<T> {
     }
 
     /// Search the [`ATree`] for arbitrary boolean expressions that match the [`Event`].
+    #[inline]
     pub fn search(&'_ self, event: &Event) -> Result<Report<'_, T>, ATreeError<'_>> {
+        self.search_in(event, Global)
+    }
+
+    pub fn search_in<A: Allocator>(
+        &'_ self,
+        event: &Event,
+        allocator: A,
+    ) -> Result<Report<'_, T>, ATreeError<'_>> {
         let mut results = EvaluationResult::new(self.nodes.len());
         let mut matches = Vec::with_capacity(50);
 
         // Since the predicates will already be evaluated and their parents will be put into the
         // queues, then there is no need to keep a queue for them.
-        let mut queues = vec![Vec::with_capacity(50); self.max_level - 1];
+        let mut queues = vec![Vec::with_capacity_in(50, &allocator); self.max_level - 1];
+
         process_predicates(
             &self.predicates,
             &self.nodes,
@@ -555,13 +566,13 @@ fn add_predicate<T>(node_id: NodeId, nodes: &Slab<Entry<T>>, predicates: &mut Ve
 }
 
 #[inline]
-fn process_predicates<'a, T>(
+fn process_predicates<'a, T, A: Allocator>(
     predicates: &[NodeId],
     nodes: &'a Slab<Entry<T>>,
     event: &Event,
     matches: &mut Vec<&'a T>,
     results: &mut EvaluationResult,
-    queues: &mut [Vec<(NodeId, &'a Entry<T>)>],
+    queues: &mut [Vec<(NodeId, &'a Entry<T>), A>],
 ) {
     for predicate_id in predicates {
         let node = &nodes[*predicate_id];

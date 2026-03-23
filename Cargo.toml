@@ -29,6 +29,10 @@ keywords = [
     "tree"
 ]
 
+[features]
+default = []
+nightly = []
+
 [[bench]]
 name = "benchmarks"
 harness = false
@@ -45,6 +49,7 @@ slab = "0.4"
 thiserror = "2.0"
 
 [dev-dependencies]
+bumpalo = { version = "3.20", features = ["allocator_api"] }
 criterion = { version = "0.8", features = ["html_reports"] }
 serde = "1.0"
 serde_json = "1.0"

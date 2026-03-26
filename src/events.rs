@@ -2,10 +2,9 @@ use crate::{
     predicates::PredicateKind,
     strings::{StringId, StringTable},
 };
-use itertools::Itertools;
 use rust_decimal::Decimal;
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     fmt::{Display, Formatter},
     ops::Index,
 };
@@ -124,7 +123,7 @@ impl<'atree> EventBuilder<'atree> {
     /// of integers.
     pub fn with_integer_list(&mut self, name: &str, value: &[i64]) -> Result<(), EventError> {
         self.add_value(name, AttributeKind::IntegerList, || {
-            let values = value.iter().sorted().unique().cloned().collect_vec();
+            let values = value.iter().copied().collect();
             AttributeValue::IntegerList(values)
         })
     }
@@ -147,12 +146,7 @@ impl<'atree> EventBuilder<'atree> {
     /// of strings.
     pub fn with_string_list(&mut self, name: &str, values: &[&str]) -> Result<(), EventError> {
         self.add_value(name, AttributeKind::StringList, || {
-            let values: Vec<_> = values
-                .iter()
-                .map(|v| self.strings.get(v))
-                .sorted()
-                .unique()
-                .collect();
+            let values = values.iter().map(|v| self.strings.get(v)).collect();
             AttributeValue::StringList(values)
         })
     }
@@ -199,8 +193,8 @@ pub enum AttributeValue {
     Integer(i64),
     Float(Decimal),
     String(StringId),
-    IntegerList(Vec<i64>),
-    StringList(Vec<StringId>),
+    IntegerList(HashSet<i64>),
+    StringList(HashSet<StringId>),
     Undefined,
 }
 

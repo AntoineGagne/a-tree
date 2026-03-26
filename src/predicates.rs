@@ -4,6 +4,7 @@ use crate::{
 };
 use rust_decimal::Decimal;
 use std::{
+    collections::HashSet,
     fmt::{Display, Formatter},
     hash::{Hash, Hasher},
     ops::Not,
@@ -239,10 +240,11 @@ impl SetOperator {
         }
     }
 
-    fn apply<T: Ord>(&self, haystack: &[T], needle: &T) -> bool {
+    #[inline]
+    fn apply<T: Eq + Hash>(&self, haystack: &HashSet<T>, needle: &T) -> bool {
         match self {
-            Self::In => haystack.binary_search(needle).is_ok(),
-            Self::NotIn => haystack.binary_search(needle).is_err(),
+            Self::In => haystack.contains(needle),
+            Self::NotIn => !haystack.contains(needle),
         }
     }
 }
@@ -372,7 +374,7 @@ impl ListOperator {
         }
     }
 
-    fn apply<T: Ord>(&self, left: &[T], right: &[T]) -> bool {
+    fn apply<T: Eq + Hash>(&self, left: &HashSet<T>, right: &HashSet<T>) -> bool {
         match self {
             Self::OneOf => one_of(left, right),
             Self::NoneOf => none_of(left, right),
@@ -394,70 +396,23 @@ impl Display for ListOperator {
 }
 
 #[inline]
-fn none_of<T: Ord>(left: &[T], right: &[T]) -> bool {
-    !one_of(left, right)
-}
-
-fn one_of<T: Ord>(left: &[T], right: &[T]) -> bool {
-    use std::cmp::Ordering;
-
-    if left.is_empty() || right.is_empty() {
-        return false;
-    }
-
-    let mut i = 0usize;
-    let mut j = 0usize;
-    while j < left.len() && i < right.len() {
-        let x = &left[j];
-        let y = &right[i];
-        match y.cmp(x) {
-            Ordering::Less => {
-                i += 1;
-            }
-            Ordering::Equal => {
-                return true;
-            }
-            Ordering::Greater => {
-                j += 1;
-            }
-        }
-    }
-
-    false
+fn none_of<T: Eq + Hash>(left: &HashSet<T>, right: &HashSet<T>) -> bool {
+    left.is_disjoint(right)
 }
 
 #[inline]
-fn not_all_of<T: Ord>(left: &[T], right: &[T]) -> bool {
-    !all_of(left, right)
+fn one_of<T: Eq + Hash>(left: &HashSet<T>, right: &HashSet<T>) -> bool {
+    !left.is_disjoint(right)
 }
 
-fn all_of<T: Ord>(left: &[T], right: &[T]) -> bool {
-    use std::cmp::Ordering;
+#[inline]
+fn not_all_of<T: Eq + Hash>(left: &HashSet<T>, right: &HashSet<T>) -> bool {
+    !left.is_subset(right)
+}
 
-    if left.len() > right.len() {
-        return false;
-    }
-
-    let mut i = 0usize;
-    let mut j = 0usize;
-    while j < left.len() && i < right.len() {
-        let x = &left[j];
-        let y = &right[i];
-        match y.cmp(x) {
-            Ordering::Less => {
-                i += 1;
-            }
-            Ordering::Equal => {
-                i += 1;
-                j += 1;
-            }
-            Ordering::Greater => {
-                break;
-            }
-        }
-    }
-
-    j >= left.len()
+#[inline]
+fn all_of<T: Eq + Hash>(left: &HashSet<T>, right: &HashSet<T>) -> bool {
+    left.is_subset(right)
 }
 
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]
@@ -512,10 +467,27 @@ impl Display for NullOperator {
     }
 }
 
-#[derive(Hash, Eq, PartialEq, Clone, Debug)]
+#[derive(Eq, PartialEq, Clone, Debug)]
 pub enum ListLiteral {
-    IntegerList(Vec<i64>),
-    StringList(Vec<StringId>),
+    IntegerList(HashSet<i64>),
+    StringList(HashSet<StringId>),
+}
+
+impl Hash for ListLiteral {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        match self {
+            Self::IntegerList(set) => {
+                let mut elements: Vec<i64> = set.iter().copied().collect();
+                elements.sort();
+                elements.hash(state);
+            }
+            Self::StringList(set) => {
+                let mut elements: Vec<StringId> = set.iter().copied().collect();
+                elements.sort();
+                elements.hash(state);
+            }
+        }
+    }
 }
 
 impl Display for ListLiteral {
@@ -715,7 +687,7 @@ mod tests {
         let mut builder = an_event_builder(&attributes, &strings);
         builder.with_integer("exchange_id", AN_EXCHANGE_ID).unwrap();
         let event = builder.build().unwrap();
-        let predicate = set_in!(&attributes, "exchange_id", integer_list!(vec![]));
+        let predicate = set_in!(&attributes, "exchange_id", integer_list!(HashSet::from([])));
 
         assert_eq!(Some(false), predicate.evaluate(&event));
     }
@@ -762,7 +734,10 @@ mod tests {
         let predicate = Predicate::new(
             &attributes,
             "exchange_id",
-            PredicateKind::Set(SetOperator::NotIn, ListLiteral::IntegerList(vec![])),
+            PredicateKind::Set(
+                SetOperator::NotIn,
+                ListLiteral::IntegerList(HashSet::from([])),
+            ),
         )
         .unwrap();
 
@@ -936,7 +911,7 @@ mod tests {
             .unwrap();
         let event = builder.build().unwrap();
 
-        let predicate = all_of!(&attributes, "deals", string_list!(vec![]));
+        let predicate = all_of!(&attributes, "deals", string_list!(HashSet::from([])));
 
         assert_eq!(Some(false), predicate.evaluate(&event));
     }
@@ -951,7 +926,11 @@ mod tests {
         builder.with_string_list("deals", &[]).unwrap();
         let event = builder.build().unwrap();
 
-        let predicate = all_of!(&attributes, "deals", string_list!(vec![id, another_id]));
+        let predicate = all_of!(
+            &attributes,
+            "deals",
+            string_list!(HashSet::from([id, another_id]))
+        );
 
         assert_eq!(Some(true), predicate.evaluate(&event));
     }
@@ -969,7 +948,11 @@ mod tests {
             .unwrap();
         let event = builder.build().unwrap();
 
-        let predicate = all_of!(&attributes, "deals", string_list!(vec![id, another_id]));
+        let predicate = all_of!(
+            &attributes,
+            "deals",
+            string_list!(HashSet::from([id, another_id]))
+        );
 
         assert_eq!(Some(false), predicate.evaluate(&event));
     }
@@ -994,11 +977,15 @@ mod tests {
             .unwrap();
         let event_2 = builder.build().unwrap();
 
-        let predicate = all_of!(&attributes, "deals", string_list!(vec![id, another_id]));
+        let predicate = all_of!(
+            &attributes,
+            "deals",
+            string_list!(HashSet::from([id, another_id]))
+        );
         let predicate_2 = all_of!(
             &attributes,
             "deals",
-            string_list!(vec![a_third_id, a_fourth_id])
+            string_list!(HashSet::from([a_third_id, a_fourth_id]))
         );
 
         assert_eq!(Some(false), predicate.evaluate(&event));
@@ -1023,7 +1010,7 @@ mod tests {
         let predicate = all_of!(
             &attributes,
             "deals",
-            string_list!(vec![id, another_id, a_third_id, a_fourth_id])
+            string_list!(HashSet::from([id, another_id, a_third_id, a_fourth_id]))
         );
 
         assert_eq!(Some(true), predicate.evaluate(&event));
@@ -1037,7 +1024,11 @@ mod tests {
         builder.with_integer_list("segment_ids", &[]).unwrap();
         let event = builder.build().unwrap();
 
-        let predicate = one_of!(&attributes, "segment_ids", integer_list!(vec![1, 2, 3, 4]));
+        let predicate = one_of!(
+            &attributes,
+            "segment_ids",
+            integer_list!(HashSet::from([1, 2, 3, 4]))
+        );
 
         assert_eq!(Some(false), predicate.evaluate(&event));
     }
@@ -1052,7 +1043,7 @@ mod tests {
             .unwrap();
         let event = builder.build().unwrap();
 
-        let predicate = one_of!(&attributes, "segment_ids", integer_list!(vec![]));
+        let predicate = one_of!(&attributes, "segment_ids", integer_list!(HashSet::from([])));
 
         assert_eq!(Some(false), predicate.evaluate(&event));
     }
@@ -1067,7 +1058,11 @@ mod tests {
             .unwrap();
         let event = builder.build().unwrap();
 
-        let predicate = one_of!(&attributes, "segment_ids", integer_list!(vec![1, 3, 6]));
+        let predicate = one_of!(
+            &attributes,
+            "segment_ids",
+            integer_list!(HashSet::from([1, 3, 6]))
+        );
 
         assert_eq!(Some(true), predicate.evaluate(&event));
     }
@@ -1082,7 +1077,11 @@ mod tests {
             .unwrap();
         let event = builder.build().unwrap();
 
-        let predicate = one_of!(&attributes, "segment_ids", integer_list!(vec![1, 3, 5]));
+        let predicate = one_of!(
+            &attributes,
+            "segment_ids",
+            integer_list!(HashSet::from([1, 3, 5]))
+        );
 
         assert_eq!(Some(false), predicate.evaluate(&event));
     }
@@ -1097,7 +1096,11 @@ mod tests {
             .unwrap();
         let event = builder.build().unwrap();
 
-        let predicate = none_of!(&attributes, "segment_ids", integer_list!(vec![1, 3, 5]));
+        let predicate = none_of!(
+            &attributes,
+            "segment_ids",
+            integer_list!(HashSet::from([1, 3, 5]))
+        );
 
         assert_eq!(Some(true), predicate.evaluate(&event));
     }
@@ -1112,7 +1115,11 @@ mod tests {
             .unwrap();
         let event = builder.build().unwrap();
 
-        let predicate = none_of!(&attributes, "segment_ids", integer_list!(vec![1, 3, 5]));
+        let predicate = none_of!(
+            &attributes,
+            "segment_ids",
+            integer_list!(HashSet::from([1, 3, 5]))
+        );
 
         assert_eq!(Some(false), predicate.evaluate(&event));
     }
@@ -1125,7 +1132,11 @@ mod tests {
         builder.with_integer_list("segment_ids", &[]).unwrap();
         let event = builder.build().unwrap();
 
-        let predicate = none_of!(&attributes, "segment_ids", integer_list!(vec![1, 3, 5]));
+        let predicate = none_of!(
+            &attributes,
+            "segment_ids",
+            integer_list!(HashSet::from([1, 3, 5]))
+        );
 
         assert_eq!(Some(true), predicate.evaluate(&event));
     }
@@ -1140,7 +1151,7 @@ mod tests {
             .unwrap();
         let event = builder.build().unwrap();
 
-        let predicate = none_of!(&attributes, "segment_ids", integer_list!(vec![]));
+        let predicate = none_of!(&attributes, "segment_ids", integer_list!(HashSet::from([])));
 
         assert_eq!(Some(true), predicate.evaluate(&event));
     }
@@ -1153,7 +1164,7 @@ mod tests {
         builder.with_undefined("segment_ids").unwrap();
         let event = builder.build().unwrap();
 
-        let predicate = none_of!(&attributes, "segment_ids", integer_list!(vec![]));
+        let predicate = none_of!(&attributes, "segment_ids", integer_list!(HashSet::from([])));
 
         assert_eq!(None, predicate.evaluate(&event));
     }
@@ -1259,7 +1270,7 @@ mod tests {
         let mut builder = an_event_builder(&attributes, &strings);
         builder.with_integer("exchange_id", AN_EXCHANGE_ID).unwrap();
         let event = builder.build().unwrap();
-        let predicate = set_in!(&attributes, "exchange_id", integer_list!(vec![]));
+        let predicate = set_in!(&attributes, "exchange_id", integer_list!(HashSet::from([])));
 
         assert_eq!(
             predicate.evaluate(&event).map(std::ops::Not::not),
@@ -1274,7 +1285,7 @@ mod tests {
         let mut builder = an_event_builder(&attributes, &strings);
         builder.with_integer("exchange_id", AN_EXCHANGE_ID).unwrap();
         let event = builder.build().unwrap();
-        let predicate = set_not_in!(&attributes, "exchange_id", integer_list!(vec![]));
+        let predicate = set_not_in!(&attributes, "exchange_id", integer_list!(HashSet::from([])));
 
         assert_eq!(
             predicate.evaluate(&event).map(std::ops::Not::not),
@@ -1381,7 +1392,11 @@ mod tests {
         let mut builder = an_event_builder(&attributes, &strings);
         builder.with_integer_list("segment_ids", &[]).unwrap();
         let event = builder.build().unwrap();
-        let predicate = one_of!(&attributes, "segment_ids", integer_list!(vec![1, 2, 3, 4]));
+        let predicate = one_of!(
+            &attributes,
+            "segment_ids",
+            integer_list!(HashSet::from([1, 2, 3, 4]))
+        );
 
         assert_eq!(
             predicate.evaluate(&event).map(std::ops::Not::not),
@@ -1396,7 +1411,11 @@ mod tests {
         let mut builder = an_event_builder(&attributes, &strings);
         builder.with_integer_list("segment_ids", &[]).unwrap();
         let event = builder.build().unwrap();
-        let predicate = none_of!(&attributes, "segment_ids", integer_list!(vec![1, 2, 3, 4]));
+        let predicate = none_of!(
+            &attributes,
+            "segment_ids",
+            integer_list!(HashSet::from([1, 2, 3, 4]))
+        );
 
         assert_eq!(
             predicate.evaluate(&event).map(std::ops::Not::not),
@@ -1411,7 +1430,11 @@ mod tests {
         let mut builder = an_event_builder(&attributes, &strings);
         builder.with_integer_list("segment_ids", &[]).unwrap();
         let event = builder.build().unwrap();
-        let predicate = all_of!(&attributes, "segment_ids", integer_list!(vec![1, 2, 3, 4]));
+        let predicate = all_of!(
+            &attributes,
+            "segment_ids",
+            integer_list!(HashSet::from([1, 2, 3, 4]))
+        );
 
         assert_eq!(
             predicate.evaluate(&event).map(std::ops::Not::not),
@@ -1431,7 +1454,7 @@ mod tests {
                 .unwrap();
             let event = builder.build().unwrap();
 
-            let predicate = set_in!(&attributes, "exchange_id", integer_list!(value));
+            let predicate = set_in!(&attributes, "exchange_id", integer_list!(value.into_iter().collect()));
 
             assert_eq!(Some(true), predicate.evaluate(&event));
         }
@@ -1450,7 +1473,7 @@ mod tests {
                 .unwrap();
             let event = builder.build().unwrap();
 
-            let predicate = one_of!(&attributes, "segment_ids", integer_list!(value));
+            let predicate = one_of!(&attributes, "segment_ids", integer_list!(value.into_iter().collect()));
 
             assert_eq!(Some(true), predicate.evaluate(&event));
         }
@@ -1468,14 +1491,14 @@ mod tests {
                 .unwrap();
             let event = builder.build().unwrap();
 
-            let predicate = all_of!(&attributes, "segment_ids", integer_list!(value));
+            let predicate = all_of!(&attributes, "segment_ids", integer_list!(value.into_iter().collect()));
 
             assert_eq!(Some(true), predicate.evaluate(&event));
         }
     }
 
     fn define_attributes() -> AttributeTable {
-        let definitions = vec![
+        let definitions = [
             AttributeDefinition::string_list("deals"),
             AttributeDefinition::string("deal"),
             AttributeDefinition::float("bidfloor"),

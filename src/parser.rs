@@ -43,6 +43,7 @@ mod tests {
             },
         },
     };
+    use std::collections::HashSet;
 
     #[test]
     fn return_an_error_on_empty_input() {
@@ -326,7 +327,11 @@ mod tests {
         let parsed = parse("ids one of [1]", &attributes, &mut strings);
 
         assert_eq!(
-            Ok(value!(one_of!(&attributes, "ids", integer_list!(vec![1])))),
+            Ok(value!(one_of!(
+                &attributes,
+                "ids",
+                integer_list!(HashSet::from([1]))
+            ))),
             parsed
         );
     }
@@ -342,7 +347,7 @@ mod tests {
             Ok(value!(one_of!(
                 &attributes,
                 "ids",
-                integer_list!(vec![1, 2, 3])
+                integer_list!(HashSet::from([1, 2, 3]))
             ))),
             parsed
         );
@@ -359,7 +364,7 @@ mod tests {
             Ok(value!(one_of!(
                 &attributes,
                 "ids",
-                integer_list!(vec![1, 2, 3])
+                integer_list!(HashSet::from([1, 2, 3]))
             ))),
             parsed
         );
@@ -376,7 +381,7 @@ mod tests {
             Ok(value!(one_of!(
                 &attributes,
                 "deals",
-                string_list!(vec![strings.get("deal-1")])
+                string_list!(HashSet::from([strings.get("deal-1")]))
             ))),
             parsed
         );
@@ -397,11 +402,11 @@ mod tests {
             Ok(value!(one_of!(
                 &attributes,
                 "deals",
-                string_list!(vec![
+                string_list!(HashSet::from([
                     strings.get("deal-1"),
                     strings.get("deal-2"),
                     strings.get("deal-3")
-                ])
+                ]))
             ))),
             parsed
         );
@@ -418,7 +423,7 @@ mod tests {
             Ok(value!(all_of!(
                 &attributes,
                 "ids",
-                integer_list!(vec![1, 2, 3])
+                integer_list!(HashSet::from([1, 2, 3]))
             ))),
             parsed
         );
@@ -439,7 +444,7 @@ mod tests {
             Ok(value!(all_of!(
                 &attributes,
                 "ids",
-                integer_list!(vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])
+                integer_list!(HashSet::from([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]))
             ))),
             parsed
         );
@@ -460,11 +465,11 @@ mod tests {
             Ok(value!(all_of!(
                 &attributes,
                 "deals",
-                string_list!(vec![
+                string_list!(HashSet::from([
                     strings.get("deal-1"),
                     strings.get("deal-2"),
                     strings.get("deal-3")
-                ])
+                ]))
             ))),
             parsed
         );
@@ -485,11 +490,11 @@ mod tests {
             Ok(value!(all_of!(
                 &attributes,
                 "deals",
-                string_list!(vec![
+                string_list!(HashSet::from([
                     strings.get("deal-1"),
                     strings.get("deal-2"),
                     strings.get("deal-3")
-                ])
+                ]))
             ))),
             parsed
         );
@@ -506,7 +511,7 @@ mod tests {
             Ok(value!(none_of!(
                 &attributes,
                 "ids",
-                integer_list!(vec![1, 2, 3])
+                integer_list!(HashSet::from([1, 2, 3]))
             ))),
             parsed
         );
@@ -527,11 +532,11 @@ mod tests {
             Ok(value!(none_of!(
                 &attributes,
                 "deals",
-                string_list!(vec![
+                string_list!(HashSet::from([
                     strings.get("deal-1"),
                     strings.get("deal-2"),
                     strings.get("deal-3")
-                ])
+                ]))
             ))),
             parsed
         );
@@ -552,11 +557,11 @@ mod tests {
             Ok(value!(none_of!(
                 &attributes,
                 "deals",
-                string_list!(vec![
+                string_list!(HashSet::from([
                     strings.get("deal-1"),
                     strings.get("deal-2"),
                     strings.get("deal-3")
-                ])
+                ]))
             ))),
             parsed
         );
@@ -587,11 +592,11 @@ mod tests {
             Ok(value!(set_in!(
                 &attributes,
                 "deal",
-                string_list!(vec![
+                string_list!(HashSet::from([
                     strings.get("deal-1"),
                     strings.get("deal-2"),
                     strings.get("deal-3")
-                ])
+                ]))
             ))),
             parsed
         );
@@ -612,7 +617,7 @@ mod tests {
             Ok(value!(set_not_in!(
                 &attributes,
                 "exchange_id",
-                integer_list!(vec![1, 2, 3])
+                integer_list!(HashSet::from([1, 2, 3]))
             ))),
             parsed
         );
@@ -644,12 +649,18 @@ mod tests {
                 value!(none_of!(
                     &attributes,
                     "deal_ids",
-                    string_list!(vec![strings.get("deal-2"), strings.get("deal-4")])
+                    string_list!(HashSet::from([
+                        strings.get("deal-2"),
+                        strings.get("deal-4")
+                    ]))
                 )),
                 value!(one_of!(
                     &attributes,
                     "deal_ids",
-                    string_list!(vec![strings.get("deal-1"), strings.get("deal-3")])
+                    string_list!(HashSet::from([
+                        strings.get("deal-1"),
+                        strings.get("deal-3")
+                    ]))
                 ))
             )),
             parsed
@@ -676,7 +687,10 @@ mod tests {
                 value!(none_of!(
                     &attributes,
                     "deal_ids",
-                    string_list!(vec![strings.get("deal-2"), strings.get("deal-4")])
+                    string_list!(HashSet::from([
+                        strings.get("deal-2"),
+                        strings.get("deal-4")
+                    ]))
                 ))
             )),
             parsed
@@ -704,13 +718,19 @@ mod tests {
                     value!(none_of!(
                         &attributes,
                         "deal_ids",
-                        string_list!(vec![strings.get("deal-2"), strings.get("deal-4")])
+                        string_list!(HashSet::from([
+                            strings.get("deal-2"),
+                            strings.get("deal-4")
+                        ]))
                     ))
                 ),
                 value!(one_of!(
                     &attributes,
                     "deal_ids",
-                    string_list!(vec![strings.get("deal-1"), strings.get("deal-3")])
+                    string_list!(HashSet::from([
+                        strings.get("deal-1"),
+                        strings.get("deal-3")
+                    ]))
                 ))
             )),
             parsed
@@ -733,12 +753,18 @@ mod tests {
                 value!(none_of!(
                     &attributes,
                     "deal_ids",
-                    string_list!(vec![strings.get("deal-2"), strings.get("deal-4")])
+                    string_list!(HashSet::from([
+                        strings.get("deal-2"),
+                        strings.get("deal-4")
+                    ]))
                 )),
                 value!(one_of!(
                     &attributes,
                     "deal_ids",
-                    string_list!(vec![strings.get("deal-1"), strings.get("deal-3")])
+                    string_list!(HashSet::from([
+                        strings.get("deal-1"),
+                        strings.get("deal-3")
+                    ]))
                 ))
             )),
             parsed
@@ -765,7 +791,10 @@ mod tests {
                 value!(none_of!(
                     &attributes,
                     "deal_ids",
-                    string_list!(vec![strings.get("deal-2"), strings.get("deal-4")])
+                    string_list!(HashSet::from([
+                        strings.get("deal-2"),
+                        strings.get("deal-4")
+                    ]))
                 ))
             )),
             parsed
@@ -793,13 +822,19 @@ mod tests {
                     value!(none_of!(
                         &attributes,
                         "deal_ids",
-                        string_list!(vec![strings.get("deal-2"), strings.get("deal-4")])
+                        string_list!(HashSet::from([
+                            strings.get("deal-2"),
+                            strings.get("deal-4")
+                        ]))
                     ))
                 ),
                 value!(one_of!(
                     &attributes,
                     "deal_ids",
-                    string_list!(vec![strings.get("deal-1"), strings.get("deal-3")])
+                    string_list!(HashSet::from([
+                        strings.get("deal-1"),
+                        strings.get("deal-3")
+                    ]))
                 ))
             )),
             parsed
@@ -864,10 +899,10 @@ mod tests {
                                             value!(one_of!(
                                                 &attributes,
                                                 "deal_ids",
-                                                string_list!(vec![
+                                                string_list!(HashSet::from([
                                                     strings.get("deal-1"),
                                                     strings.get("deal-2")
-                                                ])
+                                                ]))
                                             ))
                                         ),
                                         value!(equal!(
@@ -881,34 +916,34 @@ mod tests {
                                 value!(one_of!(
                                     &attributes,
                                     "deal_ids",
-                                    string_list!(vec![
+                                    string_list!(HashSet::from([
                                         strings.get("deal-3"),
                                         strings.get("deal-4")
-                                    ])
+                                    ]))
                                 ))
                             ),
                             value!(one_of!(
                                 &attributes,
                                 "segment_ids",
-                                integer_list!(vec![1, 2, 3, 4, 5, 6])
+                                integer_list!(HashSet::from([1, 2, 3, 4, 5, 6]))
                             ))
                         ),
                         value!(set_in!(
                             &attributes,
                             "continent",
-                            string_list!(vec![strings.get("NA")])
+                            string_list!(HashSet::from([strings.get("NA")]))
                         ))
                     ),
                     value!(set_in!(
                         &attributes,
                         "country",
-                        string_list!(vec![strings.get("CA"), strings.get("US")])
+                        string_list!(HashSet::from([strings.get("CA"), strings.get("US")]))
                     ))
                 ),
                 value!(set_in!(
                     &attributes,
                     "city",
-                    string_list!(vec![strings.get("QC"), strings.get("TN")])
+                    string_list!(HashSet::from([strings.get("QC"), strings.get("TN")]))
                 ))
             )),
             parsed
@@ -936,7 +971,10 @@ mod tests {
                     value!(one_of!(
                         &attributes,
                         "deal_ids",
-                        string_list!(vec![strings.get("deal-1"), strings.get("deal-2")])
+                        string_list!(HashSet::from([
+                            strings.get("deal-1"),
+                            strings.get("deal-2")
+                        ]))
                     ))
                 ),
                 and!(
@@ -947,7 +985,10 @@ mod tests {
                     value!(one_of!(
                         &attributes,
                         "deal_ids",
-                        string_list!(vec![strings.get("deal-3"), strings.get("deal-4")])
+                        string_list!(HashSet::from([
+                            strings.get("deal-3"),
+                            strings.get("deal-4")
+                        ]))
                     ))
                 )
             )),
@@ -956,7 +997,7 @@ mod tests {
     }
 
     fn define_attributes() -> AttributeTable {
-        let definitions = vec![
+        let definitions = [
             AttributeDefinition::string_list("deals"),
             AttributeDefinition::string("deal"),
             AttributeDefinition::integer("price"),

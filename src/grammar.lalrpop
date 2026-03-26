@@ -9,6 +9,7 @@ use crate::{
 use itertools::Itertools;
 use rust_decimal::Decimal;
 use lalrpop_util::ParseError;
+use std::collections::HashSet;
 
 grammar<'input>(attributes: &AttributeTable, strings: &mut StringTable);
 
@@ -234,7 +235,7 @@ ListLiteral: predicates::ListLiteral = {
 
 }
 
-List<T>: Vec<T> = {
+List<T>: HashSet<T> = {
     "[" <values:Comma<T>> "]" => {
         values.into_iter().sorted().unique().collect()
     },

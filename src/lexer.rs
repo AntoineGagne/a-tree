@@ -71,7 +71,7 @@ pub enum Token<'source> {
     IntegerLiteral(i64),
     #[regex(r#"(\"(\\.|[^"\\])*\"|\'(\\.|[^'\\])*\')"#, |lex| lex.slice().trim_matches(['\'', '"']))]
     StringLiteral(&'source str),
-    #[regex(r"[0-9]+\.[0-9]*", |lex| Decimal::from_str(lex.slice()).map_err(LexicalError::Float))]
+    #[regex(r"-?[0-9]+\.[0-9]*", |lex| Decimal::from_str(lex.slice()).map_err(LexicalError::Float))]
     FloatLiteral(Decimal),
     #[token("true", |_| true)]
     #[token("false", |_| false)]
@@ -283,6 +283,12 @@ mod tests {
         let other = lex_tokens("123.").unwrap();
         assert_eq!(vec![Token::FloatLiteral(Decimal::new(123123, 3))], actual);
         assert_eq!(vec![Token::FloatLiteral(Decimal::new(123, 0))], other);
+    }
+
+    #[test]
+    fn can_lex_negative_float() {
+        let actual = lex_tokens("-123.123").unwrap();
+        assert_eq!(vec![Token::FloatLiteral(Decimal::new(-123123, 3))], actual);
     }
 
     #[test]

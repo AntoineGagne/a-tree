@@ -17,13 +17,13 @@ pub Tree: ast::Node = {
 }
 
 Expression: ast::Node = {
+    #[precedence(level="3")] #[assoc(side="left")]
+    <left:Expression> "or" <right:Expression> => {
+        ast::Node::Or(Box::new(left), Box::new(right))
+    },
     #[precedence(level="2")] #[assoc(side="left")]
     <left:Expression> "and" <right:Expression> => {
         ast::Node::And(Box::new(left), Box::new(right))
-    },
-    #[precedence(level="2")] #[assoc(side="left")]
-    <left:Expression> "or" <right:Expression> => {
-        ast::Node::Or(Box::new(left), Box::new(right))
     },
     #[precedence(level="1")]
     NumericExpression,

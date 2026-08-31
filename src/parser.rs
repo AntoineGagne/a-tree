@@ -868,71 +868,64 @@ mod tests {
         );
 
         assert_eq!(
-            Ok(and!(
+            Ok(or!(
+                and!(
+                    and!(
+                        value!(equal!(&attributes, "exchange_id", primitive_integer!(1))),
+                        value!(variable!(&attributes, "private"))
+                    ),
+                    value!(one_of!(
+                        &attributes,
+                        "deal_ids",
+                        string_list!(vec![strings.get("deal-1"), strings.get("deal-2")])
+                    ))
+                ),
                 and!(
                     and!(
                         and!(
                             and!(
                                 and!(
-                                    or!(
-                                        and!(
-                                            and!(
-                                                value!(equal!(
-                                                    &attributes,
-                                                    "exchange_id",
-                                                    primitive_integer!(1)
-                                                )),
-                                                value!(variable!(&attributes, "private"))
-                                            ),
-                                            value!(one_of!(
-                                                &attributes,
-                                                "deal_ids",
-                                                string_list!(vec![
-                                                    strings.get("deal-1"),
-                                                    strings.get("deal-2")
-                                                ])
-                                            ))
-                                        ),
+                                    and!(
                                         value!(equal!(
                                             &attributes,
                                             "exchange_id",
                                             primitive_integer!(2)
-                                        ))
+                                        )),
+                                        value!(variable!(&attributes, "private"))
                                     ),
-                                    value!(variable!(&attributes, "private"))
+                                    value!(one_of!(
+                                        &attributes,
+                                        "deal_ids",
+                                        string_list!(vec![
+                                            strings.get("deal-3"),
+                                            strings.get("deal-4")
+                                        ])
+                                    ))
                                 ),
                                 value!(one_of!(
                                     &attributes,
-                                    "deal_ids",
-                                    string_list!(vec![
-                                        strings.get("deal-3"),
-                                        strings.get("deal-4")
-                                    ])
+                                    "segment_ids",
+                                    integer_list!(vec![1, 2, 3, 4, 5, 6])
                                 ))
                             ),
-                            value!(one_of!(
+                            value!(set_in!(
                                 &attributes,
-                                "segment_ids",
-                                integer_list!(vec![1, 2, 3, 4, 5, 6])
+                                "continent",
+                                string_list!(vec![strings.get("NA")])
                             ))
                         ),
                         value!(set_in!(
                             &attributes,
-                            "continent",
-                            string_list!(vec![strings.get("NA")])
+                            "country",
+                            string_list!(vec![strings.get("CA"), strings.get("US")])
                         ))
                     ),
                     value!(set_in!(
                         &attributes,
-                        "country",
-                        string_list!(vec![strings.get("CA"), strings.get("US")])
+                        "city",
+                        string_list!(vec![strings.get("QC"), strings.get("TN")])
                     ))
-                ),
-                value!(set_in!(
-                    &attributes,
-                    "city",
-                    string_list!(vec![strings.get("QC"), strings.get("TN")])
-                ))
+                )
             )),
             parsed
         );

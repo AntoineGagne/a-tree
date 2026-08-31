@@ -383,6 +383,29 @@ mod tests {
     }
 
     #[test]
+    fn can_parse_one_of_list_expression_with_non_consecutive_elements_string_list() {
+        let mut strings = StringTable::new();
+        let id1 = strings.get_or_update("deal-2");
+        let id2 = strings.get_or_update("deal-1");
+        let attributes = define_attributes();
+
+        let parsed = parse(
+            r##"deals one of ["deal-1", "deal-2"]"##,
+            &attributes,
+            &mut strings,
+        );
+
+        assert_eq!(
+            Ok(value!(one_of!(
+                &attributes,
+                "deals",
+                string_list!(vec![id1, id2])
+            ))),
+            parsed
+        );
+    }
+
+    #[test]
     fn can_parse_one_of_list_expression_with_string_list() {
         let mut strings = StringTable::new();
         let attributes = define_attributes();

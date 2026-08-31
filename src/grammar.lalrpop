@@ -229,7 +229,7 @@ SetExpression: ast::Node = {
 ListLiteral: predicates::ListLiteral = {
     <values:List<"integer">> => predicates::ListLiteral::IntegerList(values),
     <values:List<"string">> => predicates::ListLiteral::StringList(
-        values.iter().map(|value| strings.get_or_update(value)).collect()
+        values.iter().map(|value| strings.get_or_update(value)).sorted().collect()
     )
 
 }

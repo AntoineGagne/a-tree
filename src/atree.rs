@@ -116,6 +116,7 @@ impl<T: Eq + Hash + Clone + Debug> ATree<T> {
                 &mut self.nodes_by_ids,
             );
             increment_use_count(*node_id, &mut self.nodes);
+            add_predicate(*node_id, &self.nodes, &mut self.predicates);
             return;
         }
 
@@ -1389,5 +1390,49 @@ mod tests {
         atree.insert(&2u64, another_expression).unwrap();
 
         assert!(!atree.to_graphviz().is_empty());
+    }
+
+    #[test]
+    fn can_search_a_subscription_whose_node_is_also_a_non_access_child() {
+        let definitions = [
+            AttributeDefinition::integer("exchange_id"),
+            AttributeDefinition::string("country"),
+        ];
+        let compound = "exchange_id = 1 and country in ['CA', 'US']";
+        let standalone = "country in ['CA', 'US']";
+
+        for to_insert in [
+            [(1u64, compound), (2, standalone)],
+            [(2, standalone), (1, compound)],
+        ] {
+            let mut atree = ATree::new(&definitions).unwrap();
+            for (id, expression) in to_insert {
+                atree.insert(&id, expression).unwrap();
+            }
+
+            let mut builder = atree.make_event();
+            builder.with_integer("exchange_id", 2).unwrap();
+            builder.with_string("country", "CA").unwrap();
+            let event = builder.build().unwrap();
+            assert_eq!(vec![2u64], sorted_matches(&atree, &event));
+
+            let mut builder = atree.make_event();
+            builder.with_integer("exchange_id", 1).unwrap();
+            builder.with_string("country", "CA").unwrap();
+            let event = builder.build().unwrap();
+            assert_eq!(vec![1u64, 2], sorted_matches(&atree, &event));
+        }
+    }
+
+    fn sorted_matches(atree: &ATree<u64>, event: &Event) -> Vec<u64> {
+        let mut matches: Vec<u64> = atree
+            .search(event)
+            .unwrap()
+            .matches()
+            .iter()
+            .map(|id| **id)
+            .collect();
+        matches.sort();
+        matches
     }
 }

@@ -49,6 +49,8 @@ impl Predicate {
     pub fn evaluate(&self, event: &Event) -> Option<bool> {
         let value = &event[self.attribute];
         match (&self.kind, value) {
+            (PredicateKind::Null(NullOperator::IsEmpty), AttributeValue::Undefined) => None,
+            (PredicateKind::Null(NullOperator::IsNotEmpty), AttributeValue::Undefined) => None,
             (PredicateKind::Null(operator), value) => Some(operator.evaluate(value)),
             (_, AttributeValue::Undefined) => None,
             (PredicateKind::Variable, AttributeValue::Boolean(value)) => Some(*value),

@@ -286,7 +286,7 @@ impl<T: Eq + Hash + Clone + Debug> ATree<T> {
                 );
                 add_matches(result, node, &mut matches);
 
-                if node.is_root() {
+                if node.is_root() || result.is_none() {
                     continue;
                 }
 
@@ -577,6 +577,10 @@ fn process_predicates<'a, T>(
         let result = node.evaluate(event);
         results.set_result(*predicate_id, result);
         add_matches(result, node, matches);
+
+        if result.is_none() {
+            continue;
+        }
 
         node.parents()
             .iter()
@@ -1422,6 +1426,53 @@ mod tests {
             let event = builder.build().unwrap();
             assert_eq!(vec![1u64, 2], sorted_matches(&atree, &event));
         }
+    }
+
+    #[test]
+    fn searching_with_undefined_attributes_follow_three_valued_logic() {
+        let definitions = [
+            AttributeDefinition::integer("exchange_id"),
+            AttributeDefinition::string("country"),
+            AttributeDefinition::string("city"),
+        ];
+        let mut atree = ATree::new(&definitions).unwrap();
+        atree
+            .insert(&1u64, "exchange_id = 1 or country = 'CA'")
+            .unwrap();
+        atree
+            .insert(&2u64, "exchange_id = 1 and country = 'CA'")
+            .unwrap();
+        atree
+            .insert(
+                &3u64,
+                "exchange_id = 1 or (country = 'CA' and city in ['QC'])",
+            )
+            .unwrap();
+        atree
+            .insert(&4u64, "city is null or country = 'US'")
+            .unwrap();
+
+        let search = |exchange_id: Option<i64>, country: Option<&str>, city: Option<&str>| {
+            let mut builder = atree.make_event();
+            if let Some(value) = exchange_id {
+                builder.with_integer("exchange_id", value).unwrap();
+            }
+            if let Some(value) = country {
+                builder.with_string("country", value).unwrap();
+            }
+            if let Some(value) = city {
+                builder.with_string("city", value).unwrap();
+            }
+            sorted_matches(&atree, &builder.build().unwrap())
+        };
+
+        assert_eq!(vec![4u64], search(None, None, None));
+        assert_eq!(vec![1u64, 4], search(None, Some("CA"), None));
+        assert_eq!(vec![1u64, 3, 4], search(Some(1), None, None));
+        assert_eq!(vec![1u64, 2, 3, 4], search(Some(1), Some("CA"), None));
+        assert_eq!(vec![1u64, 3], search(None, Some("CA"), Some("QC")));
+        assert_eq!(Vec::<u64>::new(), search(None, None, Some("QC")));
+        assert_eq!(vec![4u64], search(Some(2), Some("FR"), None));
     }
 
     fn sorted_matches(atree: &ATree<u64>, event: &Event) -> Vec<u64> {

@@ -120,47 +120,16 @@ impl<T: Eq + Hash + Clone + Debug> ATree<T> {
             return;
         }
 
-        let is_and = matches!(&root, OptimizedNode::And(_, _));
+        let is_and = matches!(&root, OptimizedNode::And(_));
         let cost = root.cost();
         let node_id = match root {
-            OptimizedNode::And(left, right) | OptimizedNode::Or(left, right) => {
-                let left_id = self.insert_node(*left);
-                let right_id = self.insert_node(*right);
-                let left_entry = &self.nodes[left_id];
-                let right_entry = &self.nodes[right_id];
-                let rnode = ATreeNode::RNode(RNode {
-                    level: 1 + std::cmp::max(left_entry.node.level(), right_entry.node.level()),
-                    operator: if is_and { Operator::And } else { Operator::Or },
-                    children: if left_entry.cost > right_entry.cost {
-                        vec![right_id, left_id]
-                    } else {
-                        vec![left_id, right_id]
-                    },
-                });
-                let node_id = insert_node(
-                    &mut self.expression_to_node,
-                    &mut self.nodes,
-                    &expression_id,
-                    rnode,
-                    Some(subscription_id.clone()),
-                    cost,
-                );
-                if is_and {
-                    choose_access_child(
-                        left_id,
-                        right_id,
-                        node_id,
-                        &mut self.nodes,
-                        &mut self.predicates,
-                    );
-                } else {
-                    add_parent(&mut self.nodes[left_id], node_id);
-                    add_parent(&mut self.nodes[right_id], node_id);
-                    add_predicate(left_id, &self.nodes, &mut self.predicates);
-                    add_predicate(right_id, &self.nodes, &mut self.predicates);
-                }
-                node_id
-            }
+            OptimizedNode::And(children) | OptimizedNode::Or(children) => self.insert_nary(
+                expression_id,
+                is_and,
+                children,
+                cost,
+                Some(subscription_id.clone()),
+            ),
             OptimizedNode::Value(value) => {
                 let lnode = ATreeNode::lnode(&value);
                 let node_id = insert_node(
@@ -180,6 +149,59 @@ impl<T: Eq + Hash + Clone + Debug> ATree<T> {
         self.max_level = get_max_level(&self.roots, &self.nodes);
     }
 
+    fn insert_nary(
+        &mut self,
+        expression_id: ExpressionId,
+        is_and: bool,
+        children: Vec<OptimizedNode>,
+        cost: u64,
+        subscription_id: Option<T>,
+    ) -> NodeId {
+        let operator = if is_and { Operator::And } else { Operator::Or };
+        let child_ids: Vec<NodeId> = children
+            .into_iter()
+            .map(|child| self.insert_node(child))
+            .collect();
+        let level = 1 + child_ids
+            .iter()
+            .map(|id| self.nodes[*id].node.level())
+            .max()
+            .unwrap_or(0);
+        let mut ordered = child_ids.clone();
+        ordered.sort_by_key(|id| self.nodes[*id].cost);
+        let node = if subscription_id.is_some() {
+            ATreeNode::RNode(RNode {
+                level,
+                operator,
+                children: ordered,
+            })
+        } else {
+            ATreeNode::INode(INode {
+                parents: vec![],
+                level,
+                operator,
+                children: ordered,
+            })
+        };
+        let node_id = insert_node(
+            &mut self.expression_to_node,
+            &mut self.nodes,
+            &expression_id,
+            node,
+            subscription_id,
+            cost,
+        );
+        if is_and {
+            choose_access_child(&child_ids, node_id, &mut self.nodes, &mut self.predicates);
+        } else {
+            for id in &child_ids {
+                add_parent(&mut self.nodes[*id], node_id);
+                add_predicate(*id, &self.nodes, &mut self.predicates);
+            }
+        }
+        node_id
+    }
+
     fn insert_node(&mut self, node: OptimizedNode) -> NodeId {
         let expression_id = node.id();
         if let Some(node_id) = self.expression_to_node.get(&expression_id) {
@@ -188,48 +210,11 @@ impl<T: Eq + Hash + Clone + Debug> ATree<T> {
             return *node_id;
         }
 
-        let is_and = matches!(node, OptimizedNode::And(_, _));
+        let is_and = matches!(node, OptimizedNode::And(_));
         let cost = node.cost();
         match node {
-            OptimizedNode::And(left, right) | OptimizedNode::Or(left, right) => {
-                let left_id = self.insert_node(*left);
-                let right_id = self.insert_node(*right);
-                let left_entry = &self.nodes[left_id];
-                let right_entry = &self.nodes[right_id];
-                let inode = INode {
-                    parents: vec![],
-                    level: 1 + std::cmp::max(left_entry.node.level(), right_entry.node.level()),
-                    operator: if is_and { Operator::And } else { Operator::Or },
-                    children: if left_entry.cost > right_entry.cost {
-                        vec![right_id, left_id]
-                    } else {
-                        vec![left_id, right_id]
-                    },
-                };
-                let inode = ATreeNode::INode(inode);
-                let node_id = insert_node(
-                    &mut self.expression_to_node,
-                    &mut self.nodes,
-                    &expression_id,
-                    inode,
-                    None,
-                    cost,
-                );
-                if is_and {
-                    choose_access_child(
-                        left_id,
-                        right_id,
-                        node_id,
-                        &mut self.nodes,
-                        &mut self.predicates,
-                    );
-                } else {
-                    add_parent(&mut self.nodes[left_id], node_id);
-                    add_parent(&mut self.nodes[right_id], node_id);
-                    add_predicate(left_id, &self.nodes, &mut self.predicates);
-                    add_predicate(right_id, &self.nodes, &mut self.predicates);
-                }
-                node_id
+            OptimizedNode::And(children) | OptimizedNode::Or(children) => {
+                self.insert_nary(expression_id, is_and, children, cost, None)
             }
             OptimizedNode::Value(node) => {
                 let lnode = ATreeNode::lnode(&node);
@@ -442,20 +427,31 @@ fn decrement_use_count<T: Eq + Hash>(
 ) -> Option<Vec<NodeId>> {
     let node = &mut nodes[node_id];
     node.use_count -= 1;
-    let mut children = None;
     node.subscription_ids.retain(|x| *x != *subscription_id);
     nodes_by_ids.remove(subscription_id);
-    if node.use_count == 0 {
-        if !node.is_leaf() {
-            children = Some(node.children().to_vec());
-        }
-        let expression_id = node.id;
-        roots.retain(|x| *x != node_id);
-        predicates.retain(|x| *x != node_id);
-        *max_level = get_max_level(roots, nodes);
-        expression_to_node.remove(&expression_id);
-        nodes.remove(node_id);
+
+    if node.use_count != 0 {
+        return None;
     }
+
+    let expression_id = node.id;
+    let children = if node.is_leaf() {
+        None
+    } else {
+        Some(node.children().to_vec())
+    };
+
+    if let Some(children) = &children {
+        for child_id in children {
+            nodes[*child_id].remove_parent(node_id);
+        }
+    }
+
+    roots.retain(|x| *x != node_id);
+    predicates.retain(|x| *x != node_id);
+    expression_to_node.remove(&expression_id);
+    nodes.remove(node_id);
+    *max_level = get_max_level(roots, nodes);
 
     children
 }
@@ -528,21 +524,16 @@ fn change_rnode_to_inode<T>(node_id: NodeId, nodes: &mut Slab<Entry<T>>) {
     }
 }
 
-#[inline]
 fn choose_access_child<T>(
-    left_id: NodeId,
-    right_id: NodeId,
+    child_ids: &[NodeId],
     parent_id: NodeId,
     nodes: &mut Slab<Entry<T>>,
     predicates: &mut Vec<NodeId>,
 ) {
-    let left_entry = &nodes[left_id];
-    let right_entry = &nodes[right_id];
-    let accessor_id = if left_entry.cost < right_entry.cost {
-        left_id
-    } else {
-        right_id
-    };
+    let accessor_id = *child_ids
+        .iter()
+        .min_by_key(|id| nodes[**id].cost)
+        .expect("n-ary node has children");
     add_parent(&mut nodes[accessor_id], parent_id);
     add_predicate(accessor_id, nodes, predicates);
 }
@@ -765,6 +756,11 @@ impl<T> Entry<T> {
     fn parents(&self) -> &[NodeId] {
         self.node.parents()
     }
+
+    #[inline]
+    fn remove_parent(&mut self, parent_id: NodeId) {
+        self.node.remove_parent(parent_id);
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -842,6 +838,19 @@ impl ATreeNode {
             ATreeNode::RNode(node) => {
                 unreachable!(
                     "trying to insert parents to r-node {node:?} which cannot have any parents; this is a bug"
+                );
+            }
+        }
+    }
+
+    #[inline]
+    fn remove_parent(&mut self, parent_id: NodeId) {
+        match self {
+            ATreeNode::INode(node) => node.parents.retain(|p| *p != parent_id),
+            ATreeNode::LNode(node) => node.parents.retain(|p| *p != parent_id),
+            ATreeNode::RNode(node) => {
+                unreachable!(
+                    "trying to remove parents from r-node {node:?} which cannot have any; this is a bug"
                 );
             }
         }
@@ -1314,7 +1323,8 @@ mod tests {
         builder.with_integer("exchange_id", 1).unwrap();
         let event = builder.build().unwrap();
 
-        let results = atree.search(&event).unwrap().matches().to_vec();
+        let mut results = atree.search(&event).unwrap().matches().to_vec();
+        results.sort();
         assert_eq!(vec![&1u64, &2u64], results);
 
         atree.delete(&1u64);

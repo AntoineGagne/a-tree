@@ -7,8 +7,8 @@ documentation = "https://docs.rs/crate/a-tree/latest"
 authors = ["Antoine Gagné <gagnantoine@gmail.com>"]
 readme = "README.md"
 license = "MIT OR Apache-2.0"
-version = "0.5.2"
-edition = "2021"
+version = "0.6.0"
+edition = "2024"
 build = "build.rs"
 include = [
     "/benches/**",

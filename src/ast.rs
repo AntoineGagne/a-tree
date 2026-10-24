@@ -1,5 +1,4 @@
 use crate::predicates::Predicate;
-use std::cmp::{max, min};
 use std::hash::{DefaultHasher, Hash, Hasher};
 
 pub type TreeNode = Box<Node>;
@@ -14,8 +13,8 @@ pub enum Node {
 
 #[derive(PartialEq, Clone, Debug)]
 pub enum OptimizedNode {
-    And(Box<OptimizedNode>, Box<OptimizedNode>),
-    Or(Box<OptimizedNode>, Box<OptimizedNode>),
+    And(Vec<OptimizedNode>),
+    Or(Vec<OptimizedNode>),
     Value(Predicate),
 }
 
@@ -29,24 +28,17 @@ impl OptimizedNode {
     #[inline]
     pub fn id(&self) -> u64 {
         match self {
-            Self::And(left, right) => {
+            Self::And(children) | Self::Or(children) => {
                 let mut hasher = DefaultHasher::new();
-                Operator::And.hash(&mut hasher);
-
-                let left_id = left.id();
-                let right_id = right.id();
-                min(left_id, right_id).hash(&mut hasher);
-                max(left_id, right_id).hash(&mut hasher);
-                hasher.finish()
-            }
-            Self::Or(left, right) => {
-                let mut hasher = DefaultHasher::new();
-                Operator::Or.hash(&mut hasher);
-
-                let left_id = left.id();
-                let right_id = right.id();
-                min(left_id, right_id).hash(&mut hasher);
-                max(left_id, right_id).hash(&mut hasher);
+                let op = if matches!(self, Self::And(_)) {
+                    Operator::And
+                } else {
+                    Operator::Or
+                };
+                op.hash(&mut hasher);
+                let mut ids: Vec<u64> = children.iter().map(|c| c.id()).collect();
+                ids.sort_unstable();
+                ids.hash(&mut hasher);
                 hasher.finish()
             }
             Self::Value(node) => node.id(),
@@ -56,11 +48,8 @@ impl OptimizedNode {
     #[inline]
     pub fn cost(&self) -> u64 {
         match self {
-            // There is more chance that the evaluation leads to a `false` result which means that
-            // `AND` nodes are usually less expansive since they might be skipped entirely because
-            // of the propagation on demand.
-            Self::And(left, right) => left.cost() + right.cost() + 50,
-            Self::Or(left, right) => left.cost() + right.cost() + 60,
+            Self::And(c) => c.iter().map(|n| n.cost()).sum::<u64>() + 50 * (c.len() as u64 - 1),
+            Self::Or(c) => c.iter().map(|n| n.cost()).sum::<u64>() + 60 * (c.len() as u64 - 1),
             Self::Value(node) => node.cost(),
         }
     }
@@ -72,28 +61,47 @@ impl Node {
         self.zero_suppression_filter(false)
     }
 
-    pub fn zero_suppression_filter(self, negate: bool) -> OptimizedNode {
+    fn zero_suppression_filter(self, negate: bool) -> OptimizedNode {
+        match self {
+            Node::Not(inner) => inner.zero_suppression_filter(!negate),
+            Node::Value(p) => OptimizedNode::Value(if negate { !p } else { p }),
+            node => {
+                let operator = node
+                    .operator(negate)
+                    .expect("And|Or nodes should always have an operator. This is a bug");
+                let (left, right) = match node {
+                    Node::And(left, right) | Node::Or(left, right) => (left, right),
+                    _ => unreachable!("got unexpected node {:?}, this is a bug", node),
+                };
+                let mut children = Vec::new();
+                left.collect(negate, &operator, &mut children);
+                right.collect(negate, &operator, &mut children);
+                match operator {
+                    Operator::And => OptimizedNode::And(children),
+                    Operator::Or => OptimizedNode::Or(children),
+                }
+            }
+        }
+    }
+
+    fn collect(self, negate: bool, parent: &Operator, out: &mut Vec<OptimizedNode>) {
+        match self {
+            Node::Not(inner) => inner.collect(!negate, parent, out),
+            node if node.operator(negate).as_ref() == Some(parent) => {
+                if let Node::And(l, r) | Node::Or(l, r) = node {
+                    l.collect(negate, parent, out);
+                    r.collect(negate, parent, out);
+                }
+            }
+            other => out.push(other.zero_suppression_filter(negate)),
+        }
+    }
+
+    fn operator(&self, negate: bool) -> Option<Operator> {
         match (self, negate) {
-            (Self::And(left, right), true) => OptimizedNode::Or(
-                Box::new(left.zero_suppression_filter(true)),
-                Box::new(right.zero_suppression_filter(true)),
-            ),
-            (Self::Or(left, right), true) => OptimizedNode::And(
-                Box::new(left.zero_suppression_filter(true)),
-                Box::new(right.zero_suppression_filter(true)),
-            ),
-            (Self::Not(value), true) => value.zero_suppression_filter(false),
-            (Self::Not(value), false) => value.zero_suppression_filter(true),
-            (Self::Value(predicate), true) => OptimizedNode::Value(!predicate),
-            (Self::And(left, right), false) => OptimizedNode::And(
-                Box::new(left.zero_suppression_filter(false)),
-                Box::new(right.zero_suppression_filter(false)),
-            ),
-            (Self::Or(left, right), false) => OptimizedNode::Or(
-                Box::new(left.zero_suppression_filter(false)),
-                Box::new(right.zero_suppression_filter(false)),
-            ),
-            (Self::Value(predicate), _) => OptimizedNode::Value(predicate),
+            (Node::And(..), false) | (Node::Or(..), true) => Some(Operator::And),
+            (Node::Or(..), false) | (Node::And(..), true) => Some(Operator::Or),
+            _ => None,
         }
     }
 }
@@ -181,23 +189,19 @@ mod tests {
         ));
 
         assert_eq!(
+            expression.optimize(),
             optimized_node::or!(
-                optimized_node::or!(
-                    optimized_node::value!(a_predicate.clone()),
-                    optimized_node::value!(a_predicate.clone())
+                optimized_node::value!(a_predicate.clone()),
+                optimized_node::value!(a_predicate.clone()),
+                optimized_node::and!(
+                    optimized_node::value!(!a_predicate.clone()),
+                    optimized_node::value!(!a_predicate.clone())
                 ),
-                optimized_node::or!(
-                    optimized_node::and!(
-                        optimized_node::value!(!a_predicate.clone()),
-                        optimized_node::value!(!a_predicate.clone())
-                    ),
-                    optimized_node::and!(
-                        optimized_node::value!(!a_predicate.clone()),
-                        optimized_node::value!(!a_predicate.clone())
-                    )
+                optimized_node::and!(
+                    optimized_node::value!(!a_predicate.clone()),
+                    optimized_node::value!(!a_predicate.clone())
                 )
             ),
-            expression.optimize()
         );
     }
 

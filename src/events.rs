@@ -469,9 +469,11 @@ mod tests {
         let mut builder = EventBuilder::new(&attributes, &strings);
 
         assert!(builder.with_boolean("private", true).is_ok());
-        assert!(builder
-            .with_string_list("deals", &["deal-1", "deal-2"])
-            .is_ok());
+        assert!(
+            builder
+                .with_string_list("deals", &["deal-1", "deal-2"])
+                .is_ok()
+        );
         assert!(builder.with_integer("exchange_id", 1).is_ok());
         assert!(builder.with_float("bidfloor", 1, 0).is_ok());
         assert!(builder.with_string("country", "US").is_ok());

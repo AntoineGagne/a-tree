@@ -236,7 +236,9 @@ impl SetOperator {
                 self.apply(haystack, needle)
             }
             (a, b) => {
-                unreachable!("Set operation ({self:?}) in haystack {a:?} for {b:?} should never happen. This is a bug.")
+                unreachable!(
+                    "Set operation ({self:?}) in haystack {a:?} for {b:?} should never happen. This is a bug."
+                )
             }
         }
     }
@@ -272,7 +274,9 @@ impl ComparisonOperator {
             (ComparisonValue::Float(b), AttributeValue::Float(a)) => self.apply(&a, &b),
             (ComparisonValue::Integer(b), AttributeValue::Integer(a)) => self.apply(&a, &b),
             (a, b) => {
-                unreachable!("Comparison ({self:?}) between {a:?} and {b:?} should never happen. This is a bug.")
+                unreachable!(
+                    "Comparison ({self:?}) between {a:?} and {b:?} should never happen. This is a bug."
+                )
             }
         }
     }
@@ -326,7 +330,9 @@ impl EqualityOperator {
             (PrimitiveLiteral::Integer(a), AttributeValue::Integer(b)) => self.apply(&a, &b),
             (PrimitiveLiteral::String(a), AttributeValue::String(b)) => self.apply(&a, &b),
             (a, b) => {
-                unreachable!("Equality ({self:?}) between {a:?} and {b:?} should never happen. This is a bug.")
+                unreachable!(
+                    "Equality ({self:?}) between {a:?} and {b:?} should never happen. This is a bug."
+                )
             }
         }
     }
@@ -369,7 +375,9 @@ impl ListOperator {
                 self.apply(left, right)
             }
             (a, b) => {
-                unreachable!("List operations ({self:?}) between {a:?} and {b:?} should never happen. This is a bug.")
+                unreachable!(
+                    "List operations ({self:?}) between {a:?} and {b:?} should never happen. This is a bug."
+                )
             }
         }
     }
@@ -772,8 +780,8 @@ mod tests {
     }
 
     #[test]
-    fn return_true_when_looking_for_the_absence_of_an_element_in_a_set_that_does_not_contain_said_element(
-    ) {
+    fn return_true_when_looking_for_the_absence_of_an_element_in_a_set_that_does_not_contain_said_element()
+     {
         let attributes = define_attributes();
         let strings = StringTable::new();
         let mut builder = an_event_builder(&attributes, &strings);
@@ -977,8 +985,8 @@ mod tests {
     }
 
     #[test]
-    fn return_false_when_checking_if_list_whose_elements_are_not_all_contained_by_the_other_list_is_a_subset(
-    ) {
+    fn return_false_when_checking_if_list_whose_elements_are_not_all_contained_by_the_other_list_is_a_subset()
+     {
         let attributes = define_attributes();
         let mut strings = StringTable::new();
         let id = strings.get_or_update("deal-1");
@@ -1008,8 +1016,8 @@ mod tests {
     }
 
     #[test]
-    fn return_true_when_checking_if_list_whose_elements_are_all_contained_by_the_other_list_is_a_subset(
-    ) {
+    fn return_true_when_checking_if_list_whose_elements_are_all_contained_by_the_other_list_is_a_subset()
+     {
         let attributes = define_attributes();
         let mut strings = StringTable::new();
         let id = strings.get_or_update("deal-1");
@@ -1494,9 +1502,11 @@ mod tests {
         strings: &'a StringTable,
     ) -> EventBuilder<'a> {
         let mut builder = EventBuilder::new(attributes, strings);
-        assert!(builder
-            .with_string_list("deals", &["deal-1", "deal-2"])
-            .is_ok());
+        assert!(
+            builder
+                .with_string_list("deals", &["deal-1", "deal-2"])
+                .is_ok()
+        );
         assert!(builder.with_float("bidfloor", 1, 0).is_ok());
         assert!(builder.with_integer("exchange_id", AN_EXCHANGE_ID).is_ok());
         assert!(builder.with_boolean("private", true).is_ok());

@@ -840,7 +840,9 @@ impl ATreeNode {
                 node.parents.push(parent_id);
             }
             ATreeNode::RNode(node) => {
-                unreachable!("trying to insert parents to r-node {node:?} which cannot have any parents; this is a bug");
+                unreachable!(
+                    "trying to insert parents to r-node {node:?} which cannot have any parents; this is a bug"
+                );
             }
         }
     }
@@ -1324,8 +1326,8 @@ mod tests {
     }
 
     #[test]
-    fn deleting_an_expression_only_removes_the_id_not_the_expression_if_it_has_multiple_subscription_ids(
-    ) {
+    fn deleting_an_expression_only_removes_the_id_not_the_expression_if_it_has_multiple_subscription_ids()
+     {
         let definitions = [
             AttributeDefinition::boolean("private"),
             AttributeDefinition::integer("exchange_id"),

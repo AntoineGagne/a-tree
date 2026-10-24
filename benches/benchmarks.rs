@@ -1,5 +1,5 @@
 use a_tree::{ATree, AttributeDefinition};
-use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
+use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
 use itertools::Itertools;
 use serde::Deserialize;
 use std::collections::HashMap;

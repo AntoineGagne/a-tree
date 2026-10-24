@@ -5,7 +5,7 @@ use crate::{
     lexer::{Lexer, Token},
     strings::StringTable,
 };
-use lalrpop_util::{lalrpop_mod, ParseError};
+use lalrpop_util::{ParseError, lalrpop_mod};
 
 lalrpop_mod!(grammar);
 

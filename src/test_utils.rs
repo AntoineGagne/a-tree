@@ -31,14 +31,14 @@ pub mod ast {
 
 pub mod optimized_node {
     macro_rules! or {
-        ($left:expr, $right:expr) => {
-            OptimizedNode::Or(Box::new($left), Box::new($right))
+        ($($arg:expr),+ $(,)?) => {
+            OptimizedNode::Or(vec![$($arg),+])
         };
     }
 
     macro_rules! and {
-        ($left:expr, $right:expr) => {
-            OptimizedNode::And(Box::new($left), Box::new($right))
+        ($($arg:expr),+ $(,)?) => {
+            OptimizedNode::And(vec![$($arg),+])
         };
     }
 
